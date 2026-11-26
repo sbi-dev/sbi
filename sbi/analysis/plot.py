@@ -10,6 +10,7 @@ from typing import (
     List,
     Literal,
     Optional,
+    Sequence,
     Tuple,
     TypeVar,
     Union,
@@ -107,7 +108,8 @@ def marginal_plot(
             see the source code in `FigOptions`.
         fig: matplotlib figure to plot on.
         axes: matplotlib axes corresponding to fig.
-        **kwargs: Additional arguments to adjust the plot (deprecated)
+        **kwargs: Deprecated, will be removed in v0.29.0. Pass `FigOptions` fields
+            in `fig_kwargs` and plot styles in `diag_kwargs` instead.
     Returns: figure and axis of posterior distribution plot
     """
 
@@ -117,8 +119,18 @@ def marginal_plot(
 
     # backwards compatibility
     if len(kwargs) > 0:
-        fig, axes = _use_deprecated_plot(
-            marginal_plot_dep,
+        _warn_deprecated_kwargs(
+            "marginal_plot",
+            kwargs,
+            ignored={
+                "diag_kwargs": diag_kwargs,
+                "fig_kwargs": fig_kwargs,
+            },
+            samples=sample_data,
+            diag=diag,
+            sample_names=sample_names,
+        )
+        return _marginal_plot_dep(
             samples=sample_data,
             points=points,
             limits=limits,
@@ -131,7 +143,6 @@ def marginal_plot(
             axes=axes,
             **kwargs,
         )
-        return fig, axes
 
     sample_data, _, limits = prepare_for_plot(sample_data, limits)
 
@@ -217,16 +228,16 @@ def pairplot(
         figsize: Size of the entire figure.
         labels: List of strings specifying the names of the parameters.
         ticks: Position of the ticks.
-        offdiag: deprecated, use upper instead.
+        offdiag: Deprecated, will be removed in v0.29.0. Use `upper` instead.
         diag_kwargs: Additional arguments to adjust the diagonal plot,
             see the source code in `KdeDiagOptions`, `HistDiagOptions`,
             `ScatterDiagOptions` or `BarDiagOptions`.
         upper_kwargs: Additional arguments to adjust the upper diagonal plot,
             see the source code in `KdeOffDiagOptions`, `HistOffDiagOptions`,
-            `ScatterOffDiagOptions`, `ContourOffDiagOptions` or `PlotOffDiagOptions`.
+            `ScatterOffDiagOptions` or `ContourOffDiagOptions`.
         lower_kwargs: Additional arguments to adjust the lower diagonal plot,
             see the source code in `KdeOffDiagOptions`, `HistOffDiagOptions`,
-            `ScatterOffDiagOptions`, `ContourOffDiagOptions` or `PlotOffDiagOptions`.
+            `ScatterOffDiagOptions` or `ContourOffDiagOptions`.
         fig_kwargs: Additional arguments to adjust the overall figure,
             see the source code in `FigOptions`
         fig: matplotlib figure to plot on.
@@ -236,7 +247,8 @@ def pairplot(
             diagonal (instead of kde/hist) and scatter with jitter on the
             off-diagonal (instead of kde/contour). This prevents crashes from
             KDE on integer-valued data.
-        **kwargs: Additional arguments to adjust the plot (deprecated).
+        **kwargs: Deprecated, will be removed in v0.29.0. Pass `FigOptions` fields
+            in `fig_kwargs` and plot styles in the `*_kwargs` arguments instead.
 
     Returns: figure and axis of posterior distribution plot
     """
@@ -258,8 +270,23 @@ def pairplot(
 
     # Backwards compatibility
     if len(kwargs) > 0:
-        fig, axes = _use_deprecated_plot(
-            pairplot_dep,
+        _warn_deprecated_kwargs(
+            "pairplot",
+            kwargs,
+            ignored={
+                "lower": lower,
+                "diag_kwargs": diag_kwargs,
+                "upper_kwargs": upper_kwargs,
+                "lower_kwargs": lower_kwargs,
+                "fig_kwargs": fig_kwargs,
+                "discrete_indices": discrete_indices,
+            },
+            samples=sample_data,
+            diag=diag,
+            sample_names=sample_names,
+            upper=upper,
+        )
+        return _pairplot_dep(
             samples=sample_data,
             points=points,
             limits=limits,
@@ -274,7 +301,6 @@ def pairplot(
             axes=axes,
             **kwargs,
         )
-        return fig, axes
 
     sample_data, dim, limits = prepare_for_plot(sample_data, limits, points)
 
@@ -718,10 +744,13 @@ def _format_subplot(
 
 
 def _place_legend_in_empty_cell(ax, handles, labels, legend_kw):
-    """Place a legend in an empty off-diagonal cell, hiding spines and ticks."""
+    """Place a legend in an empty off-diagonal cell, hiding spines, ticks and labels."""
     ax.axis("on")
     ax.set_xticks([])
     ax.set_yticks([])
+    # A bottom-row cell got its x-label before it was turned off.
+    ax.set_xlabel("")
+    ax.set_ylabel("")
     for spine in ax.spines.values():
         spine.set_visible(False)
     ax.legend(handles, labels, **legend_kw)
@@ -1098,26 +1127,54 @@ def _prepare_fig_kwargs(
     return replace(fig_kwargs, samples_labels=sample_labels)
 
 
-def _use_deprecated_plot(
-    deprecated_method: Callable, **kwargs
-) -> Tuple[FigureBase, Axes]:
-    """
-    Issues a deprecation warning and invokes the old-style plotting method.
+def _warn_deprecated_kwargs(
+    func_name: str,
+    kwargs: Dict[str, Any],
+    ignored: Dict[str, Any],
+    samples: PreparedSamples,
+    diag: Optional[Union[str, Sequence[Optional[str]]]],
+    sample_names: Optional[List[Optional[str]]],
+    upper: Optional[Union[str, Sequence[Optional[str]]]] = None,
+) -> None:
+    """Warn that `kwargs` make `func_name` use its old implementation.
 
     Args:
-        deprecated_method: The deprecated plotting function.
-        **kwargs: Arbitrary keyword arguments passed to the deprecated function.
-
-    Returns:
-        The figure and axes objects returned by the plotting function.
+        func_name: Public name of the plotting function.
+        kwargs: The deprecated keyword arguments that were passed.
+        ignored: Newer arguments that the old implementation does not use. Those
+            that are not None are named in the warning.
+        samples: The sample set(s) passed to the old implementation.
+        diag: The diagonal style(s). Named in the warning if the old
+            implementation does not draw them as asked.
+        sample_names: Names of the `LabeledSamples`, which the old implementation
+            drops. Named in the warning if any is set.
+        upper: The upper-triangle style(s) of `pairplot`. They decide whether the
+            old implementation draws scatter lines on the diagonal.
     """
-
-    warn(
-        "you passed deprecated arguments **kwargs, use fig_kwargs instead.",
-        DeprecationWarning,
-        stacklevel=2,
+    message = (
+        f"`{func_name}` got the deprecated keyword arguments {sorted(kwargs)}. "
+        "They are deprecated since sbi v0.23.0 and will be removed in v0.29.0. "
+        "Pass `FigOptions` fields in `fig_kwargs` and plot styles in the "
+        "`*_kwargs` arguments (see `sbi.analysis.plotting_classes`)."
     )
-    return deprecated_method(**kwargs)
+    dropped = [name for name, value in ignored.items() if value is not None]
+    # Per sample set, the old diagonal draws "hist" or "kde" if asked. Otherwise it
+    # draws scatter lines if that set's upper style is "scatter", and nothing if not.
+    # Like the old implementation, use one style per set and ignore extra entries.
+    n = len(samples) if isinstance(samples, list) else 1
+    diags = diag if isinstance(diag, list) else [diag] * n
+    uppers = upper if isinstance(upper, list) else [upper] * n
+    if any(
+        d not in ("hist", "kde", "scatter" if u == "scatter" else None)
+        for d, u in zip(diags[:n], uppers[:n], strict=False)
+    ):
+        dropped.append("diag")
+    if any(sample_names or []):
+        dropped.append("LabeledSamples names")
+    if dropped:
+        message += f" This call uses the old implementation, which ignores {dropped}."
+    # stacklevel=3 points at the line that called `pairplot` or `marginal_plot`.
+    warn(message, FutureWarning, stacklevel=3)
 
 
 def _prepare_upper(
@@ -1144,7 +1201,13 @@ def _prepare_upper(
                 "You have passed mismatching values to both upper and offdiag"
                 " arguments. offdiag is deprecated, use upper instead."
             )
-        warn("offdiag is deprecated, use upper or lower instead.", stacklevel=2)
+        # stacklevel=3 points at the line that called `pairplot`.
+        warn(
+            "`offdiag` is deprecated since sbi v0.23.0 and will be removed in "
+            "v0.29.0. Use `upper` instead.",
+            FutureWarning,
+            stacklevel=3,
+        )
     return offdiag or upper
 
 
@@ -2248,7 +2311,7 @@ def pp_plot(
             of shape (n_eval,).
         labels: labels for the estimators, defaults to None.
         colors: colors for the estimators, defaults to None.
-        conf_alpha: significanecee level of the hypothesis test.
+        conf_alpha: significance level of the hypothesis test.
         n_alphas: number of cdf-values to compute the P-P plot, defaults to 100.
         ax: axis to plot on, defaults to None.
         kwargs: additional arguments for matplotlib plotting.
@@ -2333,7 +2396,7 @@ def marginal_plot_with_probs_intensity(
         label = "probability"
 
     # get colormap
-    cmap = cm.get_cmap(cmap_name)
+    cmap = plt.get_cmap(cmap_name)
 
     # case of 1d marginal
     if marginal_dim == 1:
@@ -2344,7 +2407,7 @@ def marginal_plot_with_probs_intensity(
         # create bins: all samples between bin edges are assigned to the same bin
         probs_per_marginal["bins"] = np.searchsorted(bins, probs_per_marginal["s"]) - 1
         probs_per_marginal["bins"][probs_per_marginal["bins"] < 0] = 0
-        # get mean prob for each bin (same as pandas groupy method)
+        # get mean prob for each bin (same as pandas groupby method)
         array_probs = np.concatenate(
             [probs_per_marginal["bins"][:, None], probs_per_marginal["probs"][:, None]],
             axis=1,
@@ -2388,7 +2451,7 @@ def marginal_plot_with_probs_intensity(
         )
         unique_bins = np.unique(group_idx, return_counts=True, axis=0)[0]
 
-        # get mean prob for each bin (same as pandas groupy method)
+        # get mean prob for each bin (same as pandas groupby method)
         mean_probs = np.zeros((len(unique_bins),))
         for i in range(len(unique_bins)):
             idx = np.where((group_idx == unique_bins[i]).all(axis=1))
@@ -2437,7 +2500,7 @@ def pp_plot_lc2st(
             of shape (n_eval,). One array per estimator.
         probs_null: predicted probability under the null hypothesis and evaluated on
             the test set, of shape (n_eval,). One array per null trial.
-        conf_alpha: significanecee level of the hypothesis test.
+        conf_alpha: significance level of the hypothesis test.
         kwargs: additional arguments for `pp_plot`.
 
     Returns:
@@ -2494,7 +2557,21 @@ def plot_tarp(
 
 # TO BE DEPRECATED
 # ----------------
-def pairplot_dep(
+def pairplot_dep(*args, **kwargs) -> Tuple[FigureBase, Axes]:
+    """Deprecated, will be removed in sbi v0.29.0. Use `pairplot` instead.
+
+    Takes the arguments of `_pairplot_dep`.
+    """
+    warn(
+        "`pairplot_dep` is deprecated since sbi v0.28.0 and will be removed in "
+        "v0.29.0. Use `pairplot` with `fig_kwargs` and the `*_kwargs` arguments.",
+        FutureWarning,
+        stacklevel=2,
+    )
+    return _pairplot_dep(*args, **kwargs)
+
+
+def _pairplot_dep(
     samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
     points: Optional[
         Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
@@ -2675,7 +2752,21 @@ def pairplot_dep(
     )
 
 
-def marginal_plot_dep(
+def marginal_plot_dep(*args, **kwargs) -> Tuple[FigureBase, Axes]:
+    """Deprecated, will be removed in sbi v0.29.0. Use `marginal_plot` instead.
+
+    Takes the arguments of `_marginal_plot_dep`.
+    """
+    warn(
+        "`marginal_plot_dep` is deprecated since sbi v0.28.0 and will be removed "
+        "in v0.29.0. Use `marginal_plot` with `fig_kwargs` and `diag_kwargs`.",
+        FutureWarning,
+        stacklevel=2,
+    )
+    return _marginal_plot_dep(*args, **kwargs)
+
+
+def _marginal_plot_dep(
     samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
     points: Optional[
         Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]

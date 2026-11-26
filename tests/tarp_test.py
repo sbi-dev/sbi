@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import pytest
-from torch import allclose, device, exp, eye, ones, tensor, zeros
+from torch import allclose, device, equal, exp, eye, isinf, isnan, ones, tensor, zeros
 from torch.distributions import Normal, Uniform
 from torch.nn import L1Loss
 
@@ -307,6 +307,52 @@ def test_check_tarp_detect_bias(biased_samples):
 
 ######################################################################
 ## Check TARP with SBI
+
+
+def test_run_tarp_with_references_and_invalid_x():
+    """User-given references are filtered like thetas when some xs are invalid."""
+
+    num_dim = 2
+    prior = BoxUniform(-ones(num_dim), ones(num_dim))
+
+    def simulator(theta):
+        return linear_gaussian(theta, zeros(num_dim), eye(num_dim))
+
+    theta = prior.sample((200,))
+    inferer = NPE(prior, show_progress_bars=False)
+    inferer.append_simulations(theta, simulator(theta)).train(max_num_epochs=1)
+    posterior = inferer.build_posterior()
+
+    thetas = prior.sample((100,))
+    xs = simulator(thetas)
+    xs[0, 0] = float("nan")
+    xs[1, 1] = float("inf")
+
+    # Identifiable references: reference row i is thetas row i. If the filtering
+    # mis-pairs them, the recorded pairing stops matching the valid rows.
+    references = thetas.clone()
+    seen = []
+
+    def recording_distance(refs, thetas_):
+        if not seen:
+            seen.append(refs.clone())
+        return l2(refs, thetas_)
+
+    with pytest.warns(UserWarning, match="Found 1 NaNs and 1 Infs"):
+        ecp, alpha = run_tarp(
+            thetas,
+            xs,
+            posterior=posterior,
+            references=references,
+            num_posterior_samples=50,
+            show_progress_bar=False,
+            distance=recording_distance,
+            z_score_theta=False,
+        )
+
+    is_valid = ~isnan(xs).any(dim=1) & ~isinf(xs).any(dim=1)
+    assert equal(seen[0], thetas[is_valid])
+    assert ecp.shape == alpha.shape
 
 
 @pytest.mark.slow

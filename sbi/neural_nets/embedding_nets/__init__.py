@@ -23,4 +23,6 @@ __all__ = [
     "PermutationInvariantEmbedding",
     "ResNetEmbedding1D",
     "ResNetEmbedding2D",
+    "SpectralConvEmbedding",
+    "TransformerEmbedding",
 ]

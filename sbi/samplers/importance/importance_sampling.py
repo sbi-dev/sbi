@@ -63,7 +63,7 @@ def exponentiate_weights(log_weights: Tensor) -> Tensor:
 
 
 def largest_weight_indices(weights: Tensor) -> Tensor:
-    """Returns the indizes of the largest weights.
+    """Returns the indices of the largest weights.
 
     Args:
         weights: Weights of which to return the largest indices. Usually importance
@@ -83,7 +83,7 @@ def largest_weight_indices(weights: Tensor) -> Tensor:
 def gpdfit(
     x: Tensor, sorted: bool = True, eps: float = 1e-8, return_quadrature: bool = False
 ) -> Tuple:
-    """Maximum a posteriori estimate of a Generalized Paretto distribution.
+    """Maximum a posteriori estimate of a Generalized Pareto distribution.
 
     Pytorch version of gpdfit according to
     https://github.com/avehtari/PSIS/blob/master/py/psis.py. This function will compute
@@ -93,9 +93,9 @@ def gpdfit(
         x: Tensor of floats, the data which is used to fit the GPD.
         sorted: If x is already sorted
         eps: Numerical stability jitter
-        return_quadrature: Weather to return individual results.
+        return_quadrature: Whether to return individual results.
     Returns:
-        Tuple: Parameters of the Generalized Paretto Distribution.
+        Tuple: Parameters of the Generalized Pareto Distribution.
 
     """
     if not sorted:

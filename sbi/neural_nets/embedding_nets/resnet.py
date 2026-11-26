@@ -30,7 +30,7 @@ def zero_pad(x: Tensor, c_out: int) -> Tensor:
         raise ValueError("c_out must be larger than c_in to apply zero padding.")
 
     c_in = x.shape[1]
-    a = torch.zeros(x.shape[0], c_out - c_in, x.shape[2], x.shape[3], device=x.device)
+    a = x.new_zeros(x.shape[0], c_out - c_in, x.shape[2], x.shape[3])
 
     x_aug = torch.cat([x, a], dim=1)
 
@@ -138,7 +138,12 @@ class ResNetEmbedding2D(nn.Module):
         By default, convolutional networks are used to model the transformation
         in each of the residual blocks. At the end of the network, a fully
         connected network is applied to map the flattened output of the last
-        stage to the fixed sized output vector.
+        stage to the fixed sized output vector. Its first layer infers its input
+        size from the first input or from a loaded state dict. Pass one input
+        through the network before you count its parameters, call
+        `requires_grad_()`, build an optimizer that sets up per-parameter state at
+        construction (such as Adagrad), or save a state dict to load with
+        `torch.load(weights_only=True)`.
 
         References:
 
@@ -203,7 +208,7 @@ class ResNetEmbedding2D(nn.Module):
         self.c_out = c_out
         self.activation = activation
 
-        # Intial transformation applied before the residual blocks
+        # Initial transformation applied before the residual blocks
         self.initial = nn.Sequential(
             nn.Conv2d(c_in, c_stages[0], kernel_size=7, stride=2, padding=3),
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
@@ -243,8 +248,16 @@ class ResNetEmbedding2D(nn.Module):
 
         self.blocks = nn.Sequential(*blocks)
 
-        # Final transformation is initialized on the first forward pass
-        self.final = None
+        # LazyLinear: the flattened size depends on the image size.
+        self.final = nn.Sequential(
+            nn.AvgPool2d(kernel_size=3, stride=1, padding=1),
+            nn.Flatten(),
+            nn.LazyLinear(c_hidden_fc),
+            activation(),
+            nn.Linear(c_hidden_fc, c_hidden_fc),
+            activation(),
+            nn.Linear(c_hidden_fc, c_out),
+        )
 
     def forward(self, x: Tensor) -> Tensor:
         """
@@ -269,21 +282,6 @@ class ResNetEmbedding2D(nn.Module):
 
         # Apply the residual blocks
         y = self.blocks(x)
-
-        # On first call intitalize the final transformation
-        if self.final is None:
-            # Get the shape of the input to the final layer
-            c_in_final = int(torch.tensor(y.shape[1:]).prod().item())
-
-            self.final = nn.Sequential(
-                nn.AvgPool2d(kernel_size=3, stride=1, padding=1),
-                nn.Flatten(),
-                nn.Linear(c_in_final, self.c_hidden_fc),
-                self.activation(),
-                nn.Linear(self.c_hidden_fc, self.c_hidden_fc),
-                self.activation(),
-                nn.Linear(self.c_hidden_fc, self.c_out),
-            )
 
         # Apply the final transformation
         z = self.final(y)

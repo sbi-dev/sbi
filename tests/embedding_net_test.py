@@ -37,6 +37,7 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils.metrics import check_c2st
+from sbi.utils.torchutils import process_device
 from sbi.utils.user_input_checks import (
     check_sbi_inputs,
     process_prior,
@@ -198,6 +199,7 @@ def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
     ("embedding_cls", "input_shape", "kwargs"),
     [
         (CNNEmbedding, (32, 32), {}),
+        (CNNEmbedding, (32,), {"num_conv_layers": 3}),
         (CausalCNNEmbedding, (64,), {"pool_kernel_size": 2}),
     ],
 )
@@ -217,6 +219,20 @@ def test_cnn_embedding_input_layout(embedding_cls, input_shape, kwargs):
 
     with pytest.raises(ValueError, match="Expected flat or channel-first input"):
         embedding_net(channel_last_input)
+
+
+def test_cnn_embedding_rejects_kernel_larger_than_input():
+    """In 2D, two negative output sizes have a positive product; still raise."""
+    with pytest.raises(ValueError, match="smaller kernel_size"):
+        CNNEmbedding((4, 4), kernel_size=9)
+
+
+def test_causal_cnn_embedding_rejects_dilation_list_longer_than_layers():
+    """Extra dilations must raise instead of being silently dropped."""
+    with pytest.raises(ValueError, match="dilation has 3 entries"):
+        CausalCNNEmbedding(
+            (64,), pool_kernel_size=2, num_conv_layers=2, dilation=[1, 2, 4]
+        )
 
 
 @pytest.mark.parametrize("input_shape", [(2,), (128,)])
@@ -276,6 +292,21 @@ def test_spectral_conf_embedding(input_shape, modes, conv_channels, num_layers):
 
     _test_embedding_forward_pass(embedding_net, input_shape, 2 * modes)
     _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "mdn", "NPE")
+
+
+@pytest.mark.gpu
+def test_spectral_conv_embedding_on_gpu():
+    """The Fourier matrices follow the device of the input."""
+    embedding_net = SpectralConvEmbedding(
+        in_channels=2, modes=4, conv_channels=3, num_layers=2
+    )
+    x = torch.randn(3, 2, 16)
+    expected = embedding_net(x)
+
+    device = process_device("gpu")
+    output = embedding_net.to(device)(x.to(device))
+
+    assert torch.allclose(output.cpu(), expected, atol=1e-5)
 
 
 BASE_CONFIG = {
@@ -591,15 +622,34 @@ def test_permutation_invariant_embedding_ignores_padding_per_observation(
     assert torch.allclose(batched[1], embedding(x[1:])[0], atol=1e-6)
 
 
+def test_permutation_invariant_embedding_appends_log_trial_count():
+    """The fc_subnet gets log(1 + N) of the real trials, not N of order 100."""
+    embedding = PermutationInvariantEmbedding(
+        FCEmbedding(input_dim=2, output_dim=4), trial_net_output_dim=4
+    )
+    fc_inputs = []
+    embedding.fc_subnet.register_forward_hook(
+        lambda _module, inputs, _output: fc_inputs.append(inputs[0])
+    )
+    x = torch.randn(2, 100, 2)
+    x[1, 10:] = float("nan")
+
+    embedding(x)
+
+    expected = torch.log1p(torch.tensor([100.0, 10.0]))
+    assert torch.allclose(fc_inputs[0][:, -1], expected)
+
+
 @pytest.mark.parametrize(
     "pattern", ("padded_trial", "partially_nan_trial", "no_real_trial")
 )
 def test_permutation_invariant_embedding_warns_on_invalid_padding(pattern):
     """NaN outside whole padded trials must not silently become data; warn once."""
+    trial_net_output_dim = 4
     embedding = PermutationInvariantEmbedding(
-        FCEmbedding(input_dim=2, output_dim=4),
-        trial_net_output_dim=4,
-        aggregation_fn="sum",
+        FCEmbedding(input_dim=2, output_dim=trial_net_output_dim),
+        trial_net_output_dim=trial_net_output_dim,
+        aggregation_fn="mean",
     )
     x = torch.randn(2, 3, 2)
     x[0, 1:] = float("nan")
@@ -610,11 +660,28 @@ def test_permutation_invariant_embedding_warns_on_invalid_padding(pattern):
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        embedding(x)
+        output = embedding(x)
         embedding(x)
 
     issued = [w for w in caught if "should only mark padded trials" in str(w.message)]
     assert len(issued) == (0 if pattern == "padded_trial" else 1)
+    if pattern == "no_real_trial":
+        # Zero aggregate and zero trial count; "mean" must not divide by zero.
+        fc_input = torch.zeros(1, trial_net_output_dim + 1)
+        assert torch.allclose(output[1], embedding.fc_subnet(fc_input)[0])
+
+
+def test_permutation_invariant_embedding_rejects_inf():
+    """Inf in a real trial raises instead of passing as a huge finite embedding."""
+    embedding = PermutationInvariantEmbedding(
+        FCEmbedding(input_dim=2, output_dim=4), trial_net_output_dim=4
+    )
+    x = torch.randn(2, 3, 2)
+    x[0, 1, 0] = float("inf")
+    x[:, 2] = float("nan")
+
+    with pytest.raises(ValueError, match="Input contains inf"):
+        embedding(x)
 
 
 @pytest.mark.parametrize("input_shape", [(32, 32), (32, 64), (111, 111)])
@@ -657,6 +724,15 @@ def test_2d_ResNet_cnn_embedding_net(
 
     _test_embedding_forward_pass(embedding_net, (num_channels, *input_shape), 20)
     _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "mdn", "NPE")
+
+
+def test_2d_resnet_embedding_optimizer_built_first_covers_head():
+    """The head exists before the first call, so an optimizer built first trains it."""
+    net = ResNetEmbedding2D(c_in=1, n_stages=1, blocks_per_stage=[1], c_stages=[4])
+    optimizer = torch.optim.Adam(net.parameters())
+    net(torch.randn(2, 1, 8, 8))
+    optimized = {id(p) for group in optimizer.param_groups for p in group["params"]}
+    assert all(id(p) in optimized for p in net.parameters())
 
 
 @pytest.mark.parametrize("input_shape", [(2,), (128,)])
@@ -704,7 +780,7 @@ def test_lru_isolated(
     batch_size: int = 16,
     sequence_len: int = 50,
 ):
-    """Run some random data trough an LRU layer."""
+    """Run some random data through an LRU layer."""
     lru = LRU(
         input_dim=input_dim,
         state_dim=state_dim,
@@ -822,7 +898,7 @@ def test_lru_embedding_net_isolated(
     batch_size: int = 16,
     sequence_len: int = 50,
 ):
-    """Run some random data trough an LRUEmbedding network."""
+    """Run some random data through an LRUEmbedding network."""
     embedding_net = LRUEmbedding(
         input_dim=input_dim,  # = observation_dim
         output_dim=output_dim,

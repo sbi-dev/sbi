@@ -10,6 +10,7 @@ Training
 
    sbi.inference.BNRE
    sbi.inference.FMPE
+   sbi.inference.FlowMatchingSimformer
    sbi.inference.MarginalTrainer
    sbi.inference.MCABC
    sbi.inference.MNLE
@@ -22,4 +23,5 @@ Training
    sbi.inference.NRE_A
    sbi.inference.NRE_B
    sbi.inference.NRE_C
+   sbi.inference.Simformer
    sbi.inference.SMCABC
