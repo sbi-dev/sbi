@@ -91,12 +91,7 @@ class RejectionPosterior(NeuralPosterior):
             stacklevel=2,
         )
 
-        self.potential_fn = self._bind_iid(self._x_else_default_x(x))
-
-        theta = self._theta_batched(theta)
-        return self.potential_fn(
-            theta.to(self._device), track_gradients=track_gradients
-        )
+        return self.potential(theta, x=x, track_gradients=track_gradients)
 
     def sample(
         self,

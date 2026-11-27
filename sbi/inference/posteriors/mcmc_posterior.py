@@ -217,13 +217,7 @@ class MCMCPosterior(NeuralPosterior):
             stacklevel=2,
         )
 
-        x = self._x_else_default_x(x)
-        self.potential_fn = self._bind_iid(x)
-
-        theta = self._theta_batched(theta)
-        return self.potential_fn(
-            theta.to(self._device), track_gradients=track_gradients
-        )
+        return self.potential(theta, x=x, track_gradients=track_gradients)
 
     def sample(
         self,
