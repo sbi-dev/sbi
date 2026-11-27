@@ -861,7 +861,8 @@ class RestrictedPrior(Distribution):
         Return the fraction of prior samples accepted by the classifier.
 
         It draws from the prior until `num_rejection_samples` draws are accepted or
-        `max_num_draws` draws are made, and warns if it accepted none.
+        `max_num_draws` draws are made, and warns if it accepted none. The rate is
+        saved and estimated again when these two arguments change.
 
         Args:
             num_rejection_samples: Number of accepted draws after which the estimate
@@ -876,11 +877,17 @@ class RestrictedPrior(Distribution):
         Returns:
             Tensor of the estimated acceptance rate.
         """
-        if self.acceptance_rate is None or force_update:
+        if max_num_draws is None:
+            max_num_draws = max(num_rejection_samples, 1_000_000)
+        key = (num_rejection_samples, max_num_draws)
+        # A rate saved by `sample()` has no key and is reused, as before.
+        if (
+            self.acceptance_rate is None
+            or force_update
+            or getattr(self, "_acceptance_key", key) != key
+        ):
             from sbi.samplers.rejection.rejection import count_accepted
 
-            if max_num_draws is None:
-                max_num_draws = max(num_rejection_samples, 1_000_000)
             accepted, drawn = count_accepted(
                 proposal=lambda num_draws, _: self._prior.sample((num_draws,)),
                 accept_reject_fn=self._accept_reject_fn,
@@ -899,6 +906,7 @@ class RestrictedPrior(Distribution):
                     stacklevel=2,
                 )
             self.acceptance_rate = (accepted / drawn).reshape(()).to(self._device)
+            self._acceptance_key = key
         return self.acceptance_rate  # type: ignore
 
     @property
