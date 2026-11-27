@@ -84,7 +84,7 @@ class NPSE(VectorFieldTrainer):
         density_estimator: None = None,
         sde_type: Optional[Literal["vp", "ve", "subvp"]] = None,
         device: str = "cpu",
-        logging_level: Union[int, str] = "WARNING",
+        logging_level: Optional[Union[int, str]] = None,
         summary_writer: None = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
@@ -114,8 +114,8 @@ class NPSE(VectorFieldTrainer):
                 already selects the SDE. When a string (deprecated), forwarded to
                 ``posterior_score_nn``.
             device: Device to run the training on.
-            logging_level: Logging level for the training. Can be an integer or a
-                string.
+            logging_level: Deprecated, it has no effect and goes in sbi v0.29.0.
+                Use `logging.getLogger("sbi").setLevel(...)` instead.
             summary_writer: Removed in sbi v0.28.0; passing it raises a `TypeError`.
                 Use `tracker=TensorBoardTracker(summary_writer)` instead.
             tracker: Tracking adapter used to log training metrics. If None, a

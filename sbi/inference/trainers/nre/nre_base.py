@@ -58,7 +58,7 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
             None,
         ] = None,
         device: str = "cpu",
-        logging_level: Union[int, str] = "warning",
+        logging_level: Optional[Union[int, str]] = None,
         *,
         summary_writer: None = None,
         tracker: Optional[Tracker] = None,

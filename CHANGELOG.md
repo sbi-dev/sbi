@@ -26,6 +26,7 @@
 
 * **The old `build_posterior` arguments warn whenever they are passed, and go in v0.29.0** ([#XXXX](https://github.com/sbi-dev/sbi/pull/XXXX)): `mcmc_method` and `vi_method` warned only when they differed from their defaults, so code that passed the default explicitly never saw a warning. They now default to `None` and warn whenever they are set, like `mcmc_parameters`, `vi_parameters` and the other `*_parameters` arguments, which are deprecated since v0.25.0 ([#1627](https://github.com/sbi-dev/sbi/pull/1627)). Pass `posterior_parameters`, e.g. `MCMCPosteriorParameters(method="nuts_pyro")`, instead. A call without these arguments builds the same posterior as before and does not warn.
 * **`MCMCPosterior.log_prob()` and `RejectionPosterior.log_prob()` warn with a `FutureWarning` and go in v0.29.0** ([#XXXX](https://github.com/sbi-dev/sbi/pull/XXXX)): these posteriors can only evaluate the log-probability up to a normalizing constant, and `log_prob()` warned since v0.18.0, as a `UserWarning` without a removal version. Use `.potential(theta, x)`, which returns the same values.
+* **The trainers' `logging_level` warns and goes in v0.29.0** ([#XXXX](https://github.com/sbi-dev/sbi/pull/XXXX)): it has had no effect since 2020. Set the level of sbi's loggers instead, e.g. `logging.getLogger("sbi").setLevel("INFO")`.
 
 ## v0.27.0
 

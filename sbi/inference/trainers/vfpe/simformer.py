@@ -77,7 +77,7 @@ class Simformer(MaskedVectorFieldTrainer):
         ] = None,
         sde_type: Optional[Literal["vp", "ve", "subvp"]] = None,
         device: str = "cpu",
-        logging_level: Union[int, str] = "WARNING",
+        logging_level: Optional[Union[int, str]] = None,
         *,
         summary_writer: None = None,
         tracker: Optional[Tracker] = None,
@@ -105,8 +105,8 @@ class Simformer(MaskedVectorFieldTrainer):
                 'vp' or 'subvp'. Must not be given with `vf_estimator`, which
                 already selects the SDE.
             device: Device to run the training on.
-            logging_level: Logging level for the training. Can be an integer or a
-                string.
+            logging_level: Deprecated, it has no effect and goes in sbi v0.29.0.
+                Use `logging.getLogger("sbi").setLevel(...)` instead.
             summary_writer: Removed in sbi v0.28.0; passing it raises a `TypeError`.
                 Use `tracker=TensorBoardTracker(summary_writer)` instead.
             tracker: Tracking adapter used to log training metrics. If None, a
@@ -168,7 +168,7 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
             None,
         ] = None,
         device: str = "cpu",
-        logging_level: Union[int, str] = "WARNING",
+        logging_level: Optional[Union[int, str]] = None,
         *,
         summary_writer: None = None,
         tracker: Optional[Tracker] = None,
@@ -192,8 +192,8 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
                 that receives the training inputs and returns a
                 `MaskedConditionalVectorFieldEstimator`.
             device: Device to run the training on.
-            logging_level: Logging level for the training. Can be an integer or a
-                string.
+            logging_level: Deprecated, it has no effect and goes in sbi v0.29.0.
+                Use `logging.getLogger("sbi").setLevel(...)` instead.
             summary_writer: Removed in sbi v0.28.0; passing it raises a `TypeError`.
                 Use `tracker=TensorBoardTracker(summary_writer)` instead.
             tracker: Tracking adapter used to log training metrics. If None, a

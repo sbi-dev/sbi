@@ -85,7 +85,7 @@ class FMPE(VectorFieldTrainer):
         *,
         density_estimator: None = None,
         device: str = "cpu",
-        logging_level: Union[int, str] = "WARNING",
+        logging_level: Optional[Union[int, str]] = None,
         summary_writer: None = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
@@ -106,7 +106,8 @@ class FMPE(VectorFieldTrainer):
             density_estimator: Removed in sbi v0.28.0; passing it raises a
                 `TypeError`. Use `vf_estimator` instead.
             device: Device to use for training.
-            logging_level: Logging level.
+            logging_level: Deprecated, it has no effect and goes in sbi v0.29.0.
+                Use `logging.getLogger("sbi").setLevel(...)` instead.
             summary_writer: Removed in sbi v0.28.0; passing it raises a `TypeError`.
                 Use `tracker=TensorBoardTracker(summary_writer)` instead.
             tracker: Tracking adapter used to log training metrics. If None, a

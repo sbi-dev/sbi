@@ -63,7 +63,7 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
             None,
         ] = None,
         device: str = "cpu",
-        logging_level: Union[int, str] = "WARNING",
+        logging_level: Optional[Union[int, str]] = None,
         *,
         summary_writer: None = None,
         tracker: Optional[Tracker] = None,

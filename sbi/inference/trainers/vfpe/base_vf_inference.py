@@ -277,7 +277,7 @@ class VectorFieldTrainer(
             None,
         ] = None,
         device: str = "cpu",
-        logging_level: Union[int, str] = "WARNING",
+        logging_level: Optional[Union[int, str]] = None,
         *,
         summary_writer: None = None,
         tracker: Optional[Tracker] = None,
@@ -301,8 +301,8 @@ class VectorFieldTrainer(
                 transformer_cross_attn). Alternatively, a function that
                 builds a custom neural network can be provided.
             device: Device to run the training on.
-            logging_level: Logging level for the training. Can be an integer or a
-                string.
+            logging_level: Deprecated, it has no effect and goes in sbi v0.29.0.
+                Use `logging.getLogger("sbi").setLevel(...)` instead.
             tracker: Tracking adapter used to log training metrics. If None, a
                 TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show progress bars during training.
@@ -793,7 +793,7 @@ class MaskedVectorFieldTrainer(
         posterior_observed_idx: Optional[list | Tensor] = None,
         prior: Optional[Distribution] = None,
         device: str = "cpu",
-        logging_level: Union[int, str] = "WARNING",
+        logging_level: Optional[Union[int, str]] = None,
         *,
         summary_writer: None = None,
         tracker: Optional[Tracker] = None,
@@ -818,8 +818,8 @@ class MaskedVectorFieldTrainer(
                 the default prior of `build_posterior` (rejection of samples outside
                 its support, iid sampling). Training does not use it.
             device: Device to run the training on.
-            logging_level: Logging level for the training. Can be an integer or a
-                string.
+            logging_level: Deprecated, it has no effect and goes in sbi v0.29.0.
+                Use `logging.getLogger("sbi").setLevel(...)` instead.
             summary_writer: Removed in sbi v0.28.0; passing it raises a `TypeError`.
                 Use `tracker=TensorBoardTracker(summary_writer)` instead.
             tracker: Tracking adapter used to log training metrics. If None, a

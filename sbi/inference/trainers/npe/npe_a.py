@@ -102,7 +102,7 @@ class NPE_A(PosteriorEstimatorTrainer):
         ] = None,
         num_components: int = 10,
         device: str = "cpu",
-        logging_level: Union[int, str] = "WARNING",
+        logging_level: Optional[Union[int, str]] = None,
         *,
         summary_writer: None = None,
         tracker: Optional[Tracker] = None,
@@ -130,8 +130,8 @@ class NPE_A(PosteriorEstimatorTrainer):
             num_components: Number of mixture components in the final round. All
                 other rounds train a single Gaussian.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
-            logging_level: Minimum severity of messages to log. One of the strings
-                INFO, WARNING, DEBUG, ERROR and CRITICAL.
+            logging_level: Deprecated, it has no effect and goes in sbi v0.29.0.
+                Use `logging.getLogger("sbi").setLevel(...)` instead.
             summary_writer: Removed in sbi v0.28.0; passing it raises a `TypeError`.
                 Use `tracker=TensorBoardTracker(summary_writer)` instead.
             tracker: Tracking adapter used to log training metrics. If None, a

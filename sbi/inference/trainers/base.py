@@ -288,7 +288,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         self,
         prior: Optional[Distribution] = None,
         device: str = "cpu",
-        logging_level: Union[int, str] = "WARNING",
+        logging_level: Optional[Union[int, str]] = None,
         *,
         summary_writer: None = None,
         tracker: Optional[Tracker] = None,
@@ -302,8 +302,8 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
                 distribution, see FAQ for details on how to use custom distributions.
             device: torch device on which to train the neural net and on which to
                 perform all posterior operations, e.g. gpu or cpu.
-            logging_level: Minimum severity of messages to log. One of the strings
-               "INFO", "WARNING", "DEBUG", "ERROR" and "CRITICAL".
+            logging_level: Deprecated, it has no effect and goes in sbi v0.29.0.
+                Use `logging.getLogger("sbi").setLevel(...)` instead.
             summary_writer: Removed in sbi v0.28.0; passing it raises a `TypeError`.
                 Use `tracker=TensorBoardTracker(summary_writer)` instead.
             tracker: Tracking adapter used to log training metrics. If None, a
@@ -335,6 +335,14 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         self._best_model_state_dict = None
         self._epochs_since_last_improvement = 0
 
+        if logging_level is not None:
+            warn(
+                "`logging_level` has no effect and will be removed in sbi v0.29.0. "
+                "Set the level of sbi's loggers instead, e.g. "
+                '`logging.getLogger("sbi").setLevel("INFO")`.',
+                FutureWarning,
+                stacklevel=_stacklevel_to_caller(),
+            )
         if summary_writer is not None:
             raise TypeError(
                 "`summary_writer` was removed in sbi v0.28.0. Pass "
@@ -1389,7 +1397,7 @@ class NeuralInference(
         self,
         prior: Optional[Distribution] = None,
         device: str = "cpu",
-        logging_level: Union[int, str] = "WARNING",
+        logging_level: Optional[Union[int, str]] = None,
         *,
         summary_writer: None = None,
         tracker: Optional[Tracker] = None,
@@ -1596,7 +1604,7 @@ class MaskedNeuralInference(
         posterior_observed_idx: Optional[list | Tensor] = None,
         prior: Optional[Distribution] = None,
         device: str = "cpu",
-        logging_level: Union[int, str] = "WARNING",
+        logging_level: Optional[Union[int, str]] = None,
         *,
         summary_writer: None = None,
         tracker: Optional[Tracker] = None,
@@ -1615,8 +1623,8 @@ class MaskedNeuralInference(
                 support and by the iid sampling methods. Training does not use it.
             device: torch device on which to train the neural net and on which to
                 perform all posterior operations, e.g. gpu or cpu.
-            logging_level: Minimum severity of messages to log. One of the strings
-               "INFO", "WARNING", "DEBUG", "ERROR" and "CRITICAL".
+            logging_level: Deprecated, it has no effect and goes in sbi v0.29.0.
+                Use `logging.getLogger("sbi").setLevel(...)` instead.
             summary_writer: Removed in sbi v0.28.0; passing it raises a `TypeError`.
                 Use `tracker=TensorBoardTracker(summary_writer)` instead.
             show_progress_bars: Whether to show a progressbar during simulation and
