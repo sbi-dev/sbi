@@ -2068,8 +2068,9 @@ def _plot_ranks_as_cdf(
         plt.yticks(yticks)
         plt.ylabel(ylabel)
     else:
-        # Plot ticks only
-        plt.yticks(yticks, [])
+        # Plot ticks only; tick_params keeps the labels of axes sharing this y-axis.
+        plt.yticks(yticks)
+        plt.tick_params(axis="y", labelleft=False)
 
     if diff:
         plt.axhline(y=0, color="gray", linestyle="--", alpha=0.5)
