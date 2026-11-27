@@ -224,6 +224,18 @@ def test_potential_with_1d_prior_gives_one_value_per_theta():
     assert torch.allclose(values, reference(test_theta))
 
 
+def test_likelihood_based_potential_raises_on_unbatched_theta():
+    """Test that LikelihoodBasedPotential raises ValueError when theta lacks
+    batch dim.
+    """
+    theta, x = torch.randn(20, 2), torch.randn(20, 2)
+    prior = MultivariateNormal(zeros(2), eye(2))
+    estimator = likelihood_nn("mdn")(theta, x)
+    potential = LikelihoodBasedPotential(estimator, prior, x_o=zeros(1, 2))
+    with pytest.raises(ValueError, match="`theta` must have a batch dimension"):
+        potential(zeros(2))
+
+
 def test_vector_field_potential_keeps_exact_formulas_for_1d_prior():
     """Test that the stored 1-D prior keeps the exact marginal prior.
 

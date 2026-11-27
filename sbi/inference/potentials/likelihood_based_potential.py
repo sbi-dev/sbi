@@ -325,6 +325,10 @@ def _log_likelihoods_over_trials(
     # Shape of `theta` is (batch_dim, *event_shape). Therefore, the call below should
     # not change anything, and we just have it as "best practice" before calling
     # `DensityEstimator.log_prob`.
+    if theta.dim() < 2:
+        raise ValueError(
+            f"`theta` must have a batch dimension, got shape {tuple(theta.shape)}."
+        )
     theta = reshape_to_batch_event(theta, event_shape=theta.shape[1:])
 
     # Calculate likelihood in one batch.

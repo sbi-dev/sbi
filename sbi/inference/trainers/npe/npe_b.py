@@ -140,6 +140,10 @@ class NPE_B(PosteriorEstimatorTrainer):
         Returns:
             Importance-weighted log-probability of the proposal posterior.
         """
+        if theta.dim() < 2:
+            raise ValueError(
+                f"`theta` must have a batch dimension, got shape {tuple(theta.shape)}."
+            )
 
         # Evaluate prior
         # we accept prior log prob to be -Inf at theta

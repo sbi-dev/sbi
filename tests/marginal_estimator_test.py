@@ -154,3 +154,19 @@ def test_marginal_trainer_exhausted_epoch_budget_returns_the_best_weights():
     assert all(
         torch.equal(final[k], v) for k, v in trainer._best_model_state_dict.items()
     )
+
+
+def test_marginal_trainer_1d_data():
+    """Test that MarginalTrainer handles 1-D (scalar event) data without shape
+    errors.
+    """
+    x = torch.randn(100)
+    trainer = MarginalTrainer(show_progress_bars=False)
+    trainer.append_samples(x)
+    with pytest.warns(UserWarning, match="max_num_epochs"):
+        est = trainer.train(max_num_epochs=1)
+    assert est.input_shape == torch.Size([])
+    samples = est.sample((10,))
+    assert samples.shape == (10, 1)
+    log_probs = est.log_prob(samples)
+    assert log_probs.shape == (10,)
