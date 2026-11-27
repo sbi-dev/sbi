@@ -279,11 +279,85 @@ def assert_transform_to_unconstrained_supported(
         )
 
 
+class _MeanStdBuffers(nn.Module):
+    """Holds `mean` and `std` as buffers, so `.to()` moves and casts them."""
+
+    def __init__(self, mean: Union[Tensor, float], std: Union[Tensor, float]):
+        super().__init__()
+        mean, std = map(torch.as_tensor, (mean, std))
+        self.register_buffer("_mean", mean)
+        self.register_buffer("_std", std)
+
+    @property
+    def mean(self) -> Tensor:
+        return self._mean
+
+    @property
+    def std(self) -> Tensor:
+        return self._std
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        # Older pickles carry plain `mean`/`std` attributes; drop them so only the
+        # buffers remain.
+        state.pop("mean", None)
+        state.pop("std", None)
+        super().__setstate__(state)
+
+
+def _shift_scale_to_mean_std(
+    state_dict: Dict[str, Tensor], prefix: str, shift: str, scale: str
+) -> None:
+    """Converts the z-scoring buffers of older sbi, `x * scale + shift`, in place to
+    `_mean` and `_std`, so that their state dicts still load."""
+    if prefix + shift in state_dict and prefix + scale in state_dict:
+        scale_t = state_dict.pop(prefix + scale)
+        state_dict[prefix + "_mean"] = -state_dict.pop(prefix + shift) / scale_t
+        state_dict[prefix + "_std"] = 1 / scale_t
+
+
+class StandardizingTransform(_MeanStdBuffers, nflows_tf.Transform):
+    """nflows z-scoring `(x - mean) / std`, inverse `z * std + mean`.
+
+    Subtracting first keeps neighbouring float32 values apart; nflows'
+    `x * scale + shift` rounds a term of size mean / std before it cancels.
+    """
+
+    def _logabsdet(self, inputs: Tensor) -> Tensor:
+        logabsdet = -self.std.log().expand(inputs.shape[1:]).sum()
+        return logabsdet.expand(inputs.shape[0])
+
+    def forward(
+        self, inputs: Tensor, context: Optional[Tensor] = None
+    ) -> Tuple[Tensor, Tensor]:
+        return (inputs - self.mean) / self.std, self._logabsdet(inputs)
+
+    def inverse(
+        self, inputs: Tensor, context: Optional[Tensor] = None
+    ) -> Tuple[Tensor, Tensor]:
+        return inputs * self.std + self.mean, -self._logabsdet(inputs)
+
+    def _load_from_state_dict(self, state_dict, prefix, *args, **kwargs):
+        _shift_scale_to_mean_std(state_dict, prefix, "_shift", "_scale")
+        super()._load_from_state_dict(state_dict, prefix, *args, **kwargs)
+
+
+class ZukoStandardizingTransform(_MeanStdBuffers, zuko.lazy.LazyTransform):
+    """zuko z-scoring `(x - mean) / std`, inverse `z * std + mean`, see
+    `StandardizingTransform`."""
+
+    def forward(self, c: Optional[Tensor] = None) -> TorchTransform:
+        return AffineTransform(loc=self.mean, scale=self.std).inv
+
+    def _load_from_state_dict(self, state_dict, prefix, *args, **kwargs):
+        _shift_scale_to_mean_std(state_dict, prefix, "loc", "scale")
+        super()._load_from_state_dict(state_dict, prefix, *args, **kwargs)
+
+
 def standardizing_transform(
     batch_t: Tensor,
     structured_dims: bool = False,
     min_std: float = 1e-14,
-) -> nflows_tf.PointwiseAffineTransform:
+) -> StandardizingTransform:
     """Builds standardizing transform for nflows
 
     Args:
@@ -298,16 +372,14 @@ def standardizing_transform(
     Returns:
         Affine transform for z-scoring
     """
-    t_mean, t_std = z_standardization(batch_t, structured_dims, min_std)
-    return nflows_tf.PointwiseAffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
+    return StandardizingTransform(*z_standardization(batch_t, structured_dims, min_std))
 
 
-# NOTE: we need a separate function for zuko to return the precise type for pyright.
 def standardizing_transform_zuko(
     batch_t: Tensor,
     structured_dims: bool = False,
     min_std: float = 1e-14,
-) -> zuko.flows.UnconditionalTransform:
+) -> ZukoStandardizingTransform:
     """Builds standardizing transform for Zuko flows
 
     Args:
@@ -322,12 +394,8 @@ def standardizing_transform_zuko(
     Returns:
         Affine transform for z-scoring
     """
-    t_mean, t_std = z_standardization(batch_t, structured_dims, min_std)
-    return zuko.flows.UnconditionalTransform(
-        AffineTransform,
-        loc=-t_mean / t_std,
-        scale=1 / t_std,
-        buffer=True,
+    return ZukoStandardizingTransform(
+        *z_standardization(batch_t, structured_dims, min_std)
     )
 
 
@@ -440,36 +508,44 @@ def z_standardization(
         )
         return t_mean, torch.ones_like(t_mean)
 
-    t_std = values.std(dim=0)
     constant = values.amax(dim=0) == values.amin(dim=0)
     t_mean = torch.where(constant, values[0], t_mean)
+    # A float32 mean can be steps off; the mean of the centred values corrects it,
+    # and centring keeps that error out of the std. `valid_t` is a copy, so this
+    # works in place.
+    values.sub_(t_mean)
+    t_mean = t_mean + values.mean(dim=0)
+    t_std = values.std(dim=0)
+    _warn_if_below_resolution(t_mean, t_std, constant)
     t_std = torch.where(constant, torch.ones_like(t_std), t_std)
     return t_mean, t_std.clamp(min=min_std)
 
 
-class _MeanStdBuffers(nn.Module):
-    """Holds `mean` and `std` as buffers, so `.to()` moves and casts them."""
+def _warn_if_below_resolution(mean: Tensor, std: Tensor, skip: Tensor) -> None:
+    """Warn about features whose std spans fewer than about 100 representable
+    values at their mean: the data lost precision before z-scoring.
 
-    def __init__(self, mean: Union[Tensor, float], std: Union[Tensor, float]):
-        super().__init__()
-        mean, std = map(torch.as_tensor, (mean, std))
-        self.register_buffer("_mean", mean)
-        self.register_buffer("_std", std)
-
-    @property
-    def mean(self) -> Tensor:
-        return self._mean
-
-    @property
-    def std(self) -> Tensor:
-        return self._std
-
-    def __setstate__(self, state: Dict[str, Any]) -> None:
-        # Older pickles carry plain `mean`/`std` attributes; drop them so only the
-        # buffers remain.
-        state.pop("mean", None)
-        state.pop("std", None)
-        super().__setstate__(state)
+    Args:
+        mean: Mean of each feature, or one pooled mean.
+        std: Standard deviation of each feature, or one pooled std.
+        skip: Features not to check, e.g. constant ones.
+    """
+    eps = torch.finfo(std.dtype).eps
+    low = ~skip & (std < 100 * eps * mean.abs())
+    if low.any():
+        where = (
+            f"Dimension(s) {low.flatten().nonzero().flatten().tolist()}"
+            if low.ndim
+            else "The data"
+        )
+        warnings.warn(
+            f"{where} have a std below {100 * eps:.1e} "
+            f"of their mean, so {std.dtype} resolves fewer than about 100 values "
+            "per std. Subtract an offset before training (and from the prior, for "
+            "parameters).",
+            UserWarning,
+            stacklevel=3,
+        )
 
 
 class Standardize(_MeanStdBuffers):

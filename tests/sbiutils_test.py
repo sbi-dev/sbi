@@ -9,11 +9,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 import torch
+from nflows.transforms import PointwiseAffineTransform
 from sklearn.model_selection import GridSearchCV
 from sklearn.neighbors import KernelDensity
 from torch import Tensor, ones, zeros
-from torch.distributions import MultivariateNormal
+from torch.distributions import AffineTransform, MultivariateNormal
 from torch.distributions.transforms import IndependentTransform, identity_transform
+from zuko.flows import UnconditionalTransform
 
 from sbi.analysis import (
     conditional_corrcoeff,
@@ -32,6 +34,8 @@ from sbi.utils.sbiutils import (
     gradient_ascent,
     mcmc_transform,
     standardizing_net,
+    standardizing_transform,
+    standardizing_transform_zuko,
     warn_if_invalid_for_zscoring,
     z_score_parser,
     z_standardization,
@@ -1044,3 +1048,50 @@ def test_constant_features_are_centred_not_rescaled(stats_fn):
 
     assert mean[0] == batch[0, 0] and std[0] == 1.0
     assert std[1] < 0.1
+
+
+def test_z_scoring_keeps_float32_resolution():
+    """Data a few float32 steps wide at a large level keep their mean and std, and
+    the flows' z-scoring and its inverse keep neighbouring values distinct and map
+    the fitted mean to zero."""
+    batch = torch.full((1000, 1), 1e8)
+    batch[0] += 8  # one float32 step
+    k = torch.arange(8.0)
+    x = 1e6 + 0.0625 * torch.stack([k, (k == 7).float()], 1)  # in float32 steps
+
+    for stats_fn in (z_standardization, _finite_z_score_stats):
+        for structured in (False, True):
+            with pytest.warns(UserWarning, match="resolves fewer"):
+                mean, std = stats_fn(batch, structured)
+            assert mean == 1e8
+            assert torch.allclose(std, batch.double().std().float())
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        z_standardization(300 + 0.03 * torch.randn(1000, 1))  # ~1000 values per std
+    with pytest.warns(UserWarning, match="resolves fewer"):
+        x_mean, _ = z_standardization(x)
+        nflows = standardizing_transform(x)
+        zuko_t = standardizing_transform_zuko(x)()
+
+    z_nflows, z_zuko = nflows(x)[0], zuko_t(x)
+    for out in (z_nflows, z_zuko, nflows.inverse(z_nflows)[0], zuko_t.inv(z_zuko)):
+        assert [out[:, j].unique().numel() for j in range(2)] == [8, 2]
+    assert (nflows(x_mean[None])[0] == 0).all() and (zuko_t(x_mean[None]) == 0).all()
+
+
+def test_flows_load_z_scoring_of_older_sbi():
+    """State dicts of older sbi, which stored the z-scoring as `x * scale + shift`,
+    load and give the same outputs."""
+    x = torch.randn(100, 2) * 3 + 5
+    mean, std = z_standardization(x)
+    old_nflows = PointwiseAffineTransform(shift=-mean / std, scale=1 / std)
+    old_zuko = UnconditionalTransform(
+        AffineTransform, loc=-mean / std, scale=1 / std, buffer=True
+    )
+    nflows = standardizing_transform(torch.randn(10, 2))
+    zuko_t = standardizing_transform_zuko(torch.randn(10, 2))
+    nflows.load_state_dict(old_nflows.state_dict())
+    zuko_t.load_state_dict(old_zuko.state_dict())
+
+    assert torch.allclose(nflows(x)[0], old_nflows(x)[0], atol=1e-5)
+    assert torch.allclose(zuko_t()(x), old_zuko()(x), atol=1e-5)
