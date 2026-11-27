@@ -911,7 +911,8 @@ def test_prior_guide(vector_field_type, prior_type, covariance_type, K):
     train_prior = vector_field_trained_model["prior"]
 
     x_o = zeros(1, num_dim)
-    posterior = inference.build_posterior(score_estimator)
+    # Guidance changes the score, which only SDE sampling uses (FMPE defaults to ODE).
+    posterior = inference.build_posterior(score_estimator, sample_with="sde")
     posterior.set_default_x(x_o)
 
     test_prior_mean = zeros(num_dim) + 0.1
@@ -1177,7 +1178,7 @@ def test_denoise_mixture_weights_equal_posterior():
 
     marginals = Normal(m * loc, (m**2 * scale**2 + s**2).sqrt())
     expected = torch.softmax(weights.log() + marginals.log_prob(x_t), dim=-1)
-    torch.testing.assert_close(denoised.mixture_distribution.probs[0], expected)
+    torch.testing.assert_close(denoised.mixture_distribution.probs, expected)
 
 
 def test_estimate_posterior_precision_rejects_small_budget():

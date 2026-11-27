@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Tuple
 
 import pytest
@@ -12,15 +13,24 @@ from torch.distributions import Gamma, Independent, MultivariateNormal, Normal, 
 
 from sbi.inference.posteriors import VectorFieldPosterior
 from sbi.inference.potentials.vector_field_adaptor import (
+    AffineClassifierFreeGuidance,
+    AffineClassifierFreeGuidanceConfig,
+    CombinedIIDScore,
     FactorizedNPEScoreFunction,
     GaussCorrectedScoreFn,
+    IntervalGuidance,
+    IntervalGuidanceConfig,
     JacCorrectedScoreFn,
+    PriorGuide,
+    PriorGuideConfig,
+    UniversalGuidance,
+    UniversalGuidanceConfig,
     ensure_lam_positive_definite,
 )
 from sbi.inference.potentials.vector_field_potential import (
     vector_field_estimator_based_potential,
 )
-from sbi.neural_nets import posterior_score_nn
+from sbi.neural_nets import posterior_flow_nn, posterior_score_nn
 from sbi.samplers.score import Diffuser
 from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
 from sbi.utils import BoxUniform, MultipleIndependent
@@ -146,42 +156,183 @@ def test_score_fn_guidance_general(sde_type, guidance_method, num_dim):
     assert torch.isfinite(output).all(), "Output contains non-finite values"
 
 
-@pytest.mark.parametrize("sde_type", ["vp", "ve"])
-@pytest.mark.parametrize("iid_method", ["fnpe", "gauss"])
-@pytest.mark.parametrize(
-    "guidance_method",
-    [
-        ("affine_classifier_free", {"likelihood_scale": 0.7}),
-        ("interval", {"lower_bound": 0.0, "upper_bound": 1.0}),
-    ],
-)
-def test_score_fn_combined_guidance_and_iid(sde_type, iid_method, guidance_method):
-    """Test that guidance can be combined with IID score accumulation."""
+@pytest.mark.parametrize("estimator_type", ["ve", "fmpe"])
+@pytest.mark.parametrize("guidance", ["affine_classifier_free", "universal"])
+def test_neutral_guidance_returns_the_score(estimator_type, guidance):
+    """Guidance that changes nothing returns the score, not FMPE's velocity."""
     num_dim = 2
-    mean0 = torch.zeros(num_dim)
-    std0 = torch.ones(num_dim)
-    score_fn = _build_gaussian_score_estimator(sde_type, (num_dim,), mean0, std0)
+    prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
+    theta = prior.sample((100,))
+    x = theta + 0.1 * torch.randn_like(theta)
+    estimator = _build_estimator(estimator_type, theta, x)
+    # The zero-initialized output layer would make the net output zero.
+    for parameter in estimator.net.parameters():
+        torch.nn.init.normal_(parameter, std=0.1)
 
-    x_o_iid = torch.ones((5, 1))
-    guidance_name, guidance_params = guidance_method
-    score_fn = score_fn.bind(
-        x_o_iid,
-        x_is_iid=True,
-        iid_method=iid_method,
-        guidance_method=guidance_name,
-        guidance_params=guidance_params,
+    if guidance == "affine_classifier_free":
+        guided = AffineClassifierFreeGuidance(
+            estimator, prior, AffineClassifierFreeGuidanceConfig()
+        )
+    else:
+        guided = UniversalGuidance(
+            estimator,
+            prior,
+            UniversalGuidanceConfig(
+                guidance_fn=lambda input, condition, m, std: input.sum(-1) * 0.0,
+                guidance_fn_score=lambda input, condition, m, std: input * 0.0,
+            ),
+        )
+
+    inputs, conditions = torch.randn(4, num_dim), torch.randn(4, num_dim)
+    time = torch.tensor([0.5])
+    with torch.no_grad():
+        torch.testing.assert_close(
+            guided.score(inputs, conditions, time),
+            estimator.score(inputs, conditions, time),
+        )
+
+
+@pytest.mark.parametrize("covariance_type", ["diag", "full"])
+def test_prior_guide_score_does_not_depend_on_the_batch_layout(covariance_type):
+    """The sampler passes inputs of shape (samples, 1, dim) to the guidance."""
+    train_prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
+    test_prior = MultivariateNormal(torch.ones(2), 0.5 * torch.eye(2))
+    theta = train_prior.sample((100,))
+    estimator = posterior_score_nn(sde_type="ve")(theta, theta)
+    guidance = PriorGuide(
+        estimator,
+        train_prior,
+        PriorGuideConfig(
+            train_prior=train_prior,
+            test_prior=test_prior,
+            K=2,
+            covariance_type=covariance_type,
+            num_steps=50,
+        ),
+    )
+    inputs, conditions = torch.randn(5, 2), torch.randn(5, 2)
+    time = torch.tensor([0.5])
+
+    with torch.no_grad():
+        torch.testing.assert_close(
+            guidance(inputs[:, None], conditions[:, None], time)[:, 0],
+            guidance(inputs, conditions, time),
+        )
+
+
+@pytest.mark.parametrize("estimator_type", ["ve", "vp", "fmpe"])
+@pytest.mark.parametrize("num_observations", [1, 3])
+def test_prior_guide_score_is_exact_for_gaussians(estimator_type, num_observations):
+    """For posteriors N(8, 0.25) per observation, combined by `gauss` with the true
+    precision, and the prior ratio N(0, 0.5), whose tail holds the posterior,
+    prior_guide returns the exact score of the guided posterior."""
+    prior = MultivariateNormal(torch.zeros(1), torch.eye(1))
+    theta = torch.randn(100, 1)
+    estimator = _build_estimator(estimator_type, theta, theta)
+    _use_exact_gaussian_score(estimator, posterior_var=0.25)
+    if num_observations > 1:
+        precision = torch.full((1, 1), 4.0)
+        estimator = CombinedIIDScore(
+            estimator,
+            GaussCorrectedScoreFn(estimator, prior, posterior_precision=precision),
+        )
+    guidance = PriorGuide(
+        estimator,
+        prior,
+        PriorGuideConfig(train_prior=prior, test_prior=prior, K=1, num_steps=1),
+    )
+    guidance.weights, guidance.means, guidance.cov = (
+        torch.ones(1),
+        torch.zeros(1, 1),
+        torch.full((1, 1), 0.5),
+    )
+    # Each observation multiplies the prior N(0, 1) by a likelihood of precision 3.
+    posterior_precision = 1 + 3 * num_observations
+    posterior_mean = num_observations * 8.0 * 4 / posterior_precision
+    guided_var = 1 / (posterior_precision + 1 / 0.5)
+    guided_mean = guided_var * posterior_precision * posterior_mean
+    x_o = torch.full((num_observations, 1), 8.0)
+
+    for time in (torch.tensor([0.05]), torch.tensor([0.5]), torch.tensor([0.9])):
+        m, s = estimator.mean_t_fn(time), estimator.std_fn(time)
+        theta = m * guided_mean + torch.tensor([-0.5, 0.0, 0.7]).reshape(3, 1, 1)
+        exact = -(theta - m * guided_mean) / (m**2 * guided_var + s**2)
+        torch.testing.assert_close(guidance(theta, x_o, time), exact, atol=1e-4, rtol=0)
+
+
+@pytest.mark.parametrize("estimator_type", ["ve", "vp", "subvp", "fmpe"])
+def test_interval_guidance_samples_the_truncated_posterior(estimator_type):
+    """With the exact score of N(0, sd^2), a lower bound at 0 gives the half-normal."""
+    posterior_sd = 0.5
+    estimator = _build_estimator(
+        estimator_type, torch.randn(100, 1), torch.randn(100, 1)
+    )
+    _use_exact_gaussian_score(estimator, posterior_sd**2)
+    posterior = VectorFieldPosterior(
+        estimator, MultivariateNormal(torch.zeros(1), torch.eye(1)), sample_with="sde"
+    )
+    samples = posterior.sample(
+        (2000,),
+        x=torch.zeros(1, 1),
+        guidance_method="interval",
+        guidance_params={"lower_bound": 0.0, "upper_bound": None},
+        show_progress_bars=False,
     )
 
-    inputs = torch.ones((1, 1, num_dim))
-    time = torch.ones(1)
+    half_normal_mean = posterior_sd * math.sqrt(2 / math.pi)
+    half_normal_sd = posterior_sd * math.sqrt(1 - 2 / math.pi)
+    # Measured over seeds: bias up to 0.04 sd, sd ratio from 0.97 to 1.04.
+    assert abs(samples.mean() - half_normal_mean) < 0.06 * posterior_sd
+    assert abs(samples.std() / half_normal_sd - 1) < 0.08
 
-    for prior in build_random_priors(num_dim):
-        score_fn.prior = prior
-        output = score_fn.gradient(inputs, time=time)
-        assert output.shape == (1, 1, num_dim), (
-            f"Expected shape {(1, 1, num_dim)}, got {output.shape}"
+
+def test_interval_guidance_takes_one_bound_per_dimension():
+    """Tensor bounds hold one bound per dimension; an infinite bound is no bound."""
+    prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
+    theta = prior.sample((100,))
+    estimator = posterior_score_nn(sde_type="vp")(theta, theta)
+    inputs, x_o, time = 2 + torch.randn(5, 1, 2), torch.zeros(1, 2), torch.tensor([0.5])
+
+    def guided_score(**bounds) -> Tensor:
+        config = IntervalGuidanceConfig(**bounds)
+        return IntervalGuidance(estimator, prior, config)(inputs, x_o, time)
+
+    inf = float("inf")
+    with torch.no_grad():
+        per_dimension = guided_score(
+            lower_bound=torch.tensor([-0.2, -inf]), upper_bound=torch.tensor([0.3, inf])
         )
-        assert torch.isfinite(output).all(), "Output contains non-finite values"
+        masked = guided_score(
+            lower_bound=-0.2, upper_bound=0.3, mask=torch.tensor([True, False])
+        )
+    torch.testing.assert_close(per_dimension, masked)
+
+
+@pytest.mark.parametrize("iid_method", ["fnpe", "gauss", "auto_gauss", "jac_gauss"])
+def test_guidance_adjusts_the_combined_iid_posterior_once(iid_method):
+    """A prior shift moves the score of three iid observations once, not three times."""
+    estimator = _build_estimator("vp", torch.randn(100, 1), torch.randn(100, 1))
+    _use_exact_gaussian_score(estimator, posterior_var=0.5)
+    potential, _ = vector_field_estimator_based_potential(
+        estimator, MultivariateNormal(torch.zeros(1), torch.eye(1)), x_o=None
+    )
+    budget = {"precision_est_budget": 100, "precision_initial_sampler_steps": 5}
+    iid_kwargs = {
+        "x_is_iid": True,
+        "iid_method": iid_method,
+        "iid_params": budget if iid_method == "auto_gauss" else None,
+    }
+    x_o, theta, time = torch.randn(3, 1), torch.randn(4, 1, 1), torch.tensor([0.4])
+
+    plain = potential.bind(x_o, **iid_kwargs).gradient(theta, time)
+    guided = potential.bind(
+        x_o,
+        guidance_method="affine_classifier_free",
+        guidance_params={"prior_shift": 1.0},
+        **iid_kwargs,
+    ).gradient(theta, time)
+
+    torch.testing.assert_close(guided - plain, torch.ones_like(plain))
 
 
 @pytest.mark.parametrize(
@@ -299,10 +450,12 @@ def test_iid_score_is_exact_for_linear_gaussian(sde_type, iid_method):
 
     if iid_method == "gauss":
         score_fn = GaussCorrectedScoreFn(
-            estimator, prior, posterior_precision=torch.inverse(posterior_cov)
+            estimator,
+            prior,
+            posterior_precision=torch.inverse(posterior_cov),
         )
     else:
-        score_fn = JacCorrectedScoreFn(estimator, prior, ensure_lam_psd=False)
+        score_fn = JacCorrectedScoreFn(estimator, prior)
 
     posterior = true_posterior_linear_gaussian_mvn_prior(
         x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
@@ -316,6 +469,20 @@ def test_iid_score_is_exact_for_linear_gaussian(sde_type, iid_method):
             theta, posterior.mean, posterior.covariance_matrix, m, s
         )
         assert torch.allclose(score_fn(theta, x_o, time), expected, rtol=1e-8), t
+
+
+def test_jac_gauss_survives_float32_cancellation():
+    """For a posterior much narrower than the noise, I + s^2 J rounds to zero."""
+    num_dim, posterior_var = 2, 1e-4
+    prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
+    estimator = posterior_flow_nn()(prior.sample((100,)), torch.randn(100, num_dim))
+    _use_exact_gaussian_score(estimator, posterior_var)
+    score_fn = JacCorrectedScoreFn(estimator, prior)
+    inputs, x_o = torch.randn(4, 1, num_dim), torch.zeros(3, num_dim)
+
+    scores = score_fn(inputs, x_o, torch.tensor([estimator.effective_t_max]))
+
+    assert torch.isfinite(scores).all()
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
@@ -465,6 +632,24 @@ def test_fnpe_uses_custom_prior_score_weight():
     )
 
     assert not torch.allclose(no_prior(*args), default(*args))
+
+
+def _build_estimator(estimator_type: str, theta: Tensor, x: Tensor):
+    """Default FMPE ("fmpe") or NPSE (any `sde_type`) estimator."""
+    if estimator_type == "fmpe":
+        return posterior_flow_nn()(theta, x)
+    return posterior_score_nn(sde_type=estimator_type)(theta, x)
+
+
+def _use_exact_gaussian_score(estimator, posterior_var: float) -> None:
+    """Replace the score of `estimator` by the exact score of N(x, posterior_var I),
+    with one row per observation, as the iid methods expect."""
+
+    def exact_score(input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
+        m, s = estimator.mean_t_fn(t), estimator.std_fn(t)
+        return -(input - m * condition) / (m**2 * posterior_var + s**2)
+
+    estimator.score = exact_score
 
 
 class _ZeroNet(VectorFieldNet):

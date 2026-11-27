@@ -257,7 +257,7 @@ class AffineClassifierFreeGuidance(ScoreAdaptation):
         if time is None:
             time = torch.tensor([self.vf_estimator.t_min])
 
-        posterior_score = self.vf_estimator(input=input, condition=condition, time=time)
+        posterior_score = self.vf_estimator.score(input, condition, time)
         prior_score = self.marginal_prior_score(input, time)
         ll_score = posterior_score - prior_score
         ll_score_mod = ll_score * self.likelihood_scale + self.likelihood_shift
@@ -352,7 +352,7 @@ class UniversalGuidance(ScoreAdaptation):
     ) -> Tensor:
         if time is None:
             time = torch.tensor([self.vf_estimator.t_min])
-        score = self.vf_estimator(input, condition, time)
+        score = self.vf_estimator.score(input, condition, time)
         m = self.vf_estimator.mean_t_fn(time)
         std = self.vf_estimator.std_fn(time)
 
@@ -368,10 +368,15 @@ class IntervalGuidanceConfig:
     """Configuration for :class:`IntervalGuidance`.
 
     Attributes:
-        lower_bound: Optional lower bound for parameters.
-        upper_bound: Optional upper bound for parameters.
+        lower_bound: Optional lower bound for parameters: a float, or a tensor with
+            one bound per dimension (`-inf` for no bound).
+        upper_bound: Optional upper bound for parameters: a float, or a tensor with
+            one bound per dimension (`inf` for no bound). Each lower bound must be
+            less than its upper bound.
         mask: Optional boolean mask selecting constrained dimensions.
-        scale_factor: Soft-constraint strength.
+        scale_factor: Soft-constraint strength. The log-sigmoid walls have slope
+            `scale_factor * m(t) / std(t)^2`, so that they push the denoised
+            parameters by the same amount at every time.
     """
 
     lower_bound: Optional[Union[float, Tensor]]
@@ -382,15 +387,40 @@ class IntervalGuidanceConfig:
     def __post_init__(self) -> None:
         if self.lower_bound is None and self.upper_bound is None:
             raise ValueError("At least one of lower_bound or upper_bound is required.")
-        if (
-            self.lower_bound is not None
-            and self.upper_bound is not None
-            and self.lower_bound >= self.upper_bound
+        # Compare on the CPU, which holds every dtype, without converting the dtype.
+        lower, upper = (
+            b.cpu() if isinstance(b, Tensor) else b
+            for b in (self.lower_bound, self.upper_bound)
+        )
+        for name, bound, no_wall in (
+            ("lower", lower, -math.inf),
+            ("upper", upper, math.inf),
         ):
-            raise ValueError(
-                f"lower_bound ({self.lower_bound}) must be less than "
-                f"upper_bound ({self.upper_bound})."
-            )
+            if bound is None:
+                continue
+            if isinstance(bound, Tensor):
+                bad = bound.isnan().any() or (bound.isinf() & (bound != no_wall)).any()
+            else:
+                bad = math.isnan(bound) or (math.isinf(bound) and bound != no_wall)
+            if bad:
+                raise ValueError(
+                    f"{name}_bound must not be NaN or {-no_wall}: {no_wall} means no "
+                    "bound."
+                )
+        if lower is not None and upper is not None:
+            lower, upper = torch.as_tensor(lower), torch.as_tensor(upper)
+            try:
+                torch.broadcast_shapes(lower.shape, upper.shape)
+            except RuntimeError as err:
+                raise ValueError(
+                    f"lower_bound of shape {tuple(lower.shape)} and upper_bound of "
+                    f"shape {tuple(upper.shape)} do not broadcast."
+                ) from err
+            if not (lower < upper).all():
+                raise ValueError(
+                    f"lower_bound ({self.lower_bound}) must be less than "
+                    f"upper_bound ({self.upper_bound})."
+                )
 
 
 @register_guidance_method("interval", IntervalGuidanceConfig)
@@ -434,27 +464,42 @@ class IntervalGuidance(UniversalGuidance):
             config: Configuration specifying the interval bounds.
             device: The device on which to evaluate the potential.
         """
+        # A bound that broadcasts beyond the parameters would add walls.
+        shape = torch.Size(vf_estimator.input_shape)
+        for name in ("lower_bound", "upper_bound", "mask"):
+            value = getattr(config, name)
+            if not isinstance(value, Tensor):
+                continue
+            try:
+                fits = torch.broadcast_shapes(value.shape, shape) == shape
+            except RuntimeError:
+                fits = False
+            if not fits:
+                raise ValueError(
+                    f"{name} has shape {tuple(value.shape)}, but the parameters "
+                    f"have shape {tuple(shape)}."
+                )
 
         def interval_fn(
             input: Tensor, condition: Tensor, m: Tensor, std: Tensor
         ) -> Tensor:
             del condition
-            scale = config.scale_factor / (m**2 * std**2 + 1e-6)
-            upper_bound = (
-                F.logsigmoid(-scale * (input - config.upper_bound))
-                if config.upper_bound is not None
-                else torch.zeros_like(input)
-            )
-            lower_bound = (
-                F.logsigmoid(scale * (input - config.lower_bound))
-                if config.lower_bound is not None
-                else torch.zeros_like(input)
-            )
-            out = upper_bound + lower_bound
+
+            scale = config.scale_factor * m / (std**2 + 1e-6)
+
+            def wall(bound: Optional[Union[float, Tensor]], sign: float) -> Tensor:
+                if bound is None:
+                    return torch.zeros_like(input)
+                bound = torch.as_tensor(bound, dtype=input.dtype, device=input.device)
+                # An infinite bound is no wall, also when `scale` is zero.
+                finite = torch.isfinite(bound)
+                distance = input - torch.where(finite, bound, 0.0)
+                return torch.where(finite, F.logsigmoid(sign * scale * distance), 0.0)
+
+            out = wall(config.lower_bound, 1.0) + wall(config.upper_bound, -1.0)
             if config.mask is not None:
-                if config.mask.shape != out.shape:
-                    config.mask = config.mask.unsqueeze(0).expand_as(out)
-                out = torch.where(config.mask, out, torch.zeros_like(out))
+                mask = config.mask.to(out.device)
+                out = torch.where(mask, out, torch.zeros_like(out))
             return out
 
         super().__init__(
@@ -511,7 +556,9 @@ class PriorGuide(ScoreAdaptation):
 
     Fits a Gaussian mixture model to the ratio between a training prior and a
     test prior, then leverages the backward kernel of the diffusion process to
-    accurately compute the marginal adjusted posterior score.
+    accurately compute the marginal adjusted posterior score. Unlike the paper, which
+    assumes a posterior N(0, I), the backward kernel's covariance comes from the
+    Jacobian of the score, which costs one backward pass per parameter dimension.
 
     Example
     --------
@@ -569,75 +616,83 @@ class PriorGuide(ScoreAdaptation):
         )
         super().__init__(vf_estimator, prior, device)
 
-    def _sigma0_t2(self, std: Tensor) -> Tensor:
-        # From PriorGuide Eq. (12): sigma(t)^2 / (1 + sigma(t)^2)
-        # NOTE: This can be improved similar to the AutoGauss or
-        # JAC methods for IIDScoreFunctions i.e. this assumes
-        # identity covariance but one can also use an estimator
-        # of the posterior covariance.
-        return std**2 / (1.0 + std**2)
-
     def __call__(
         self, input: Tensor, condition: Tensor, time: Optional[Tensor] = None
     ) -> Tensor:
         if time is None:
-            time = torch.tensor([self.vf_estimator.t_min])
-
-        input_ = input.detach()
-        score = self.vf_estimator(input=input_, condition=condition, time=time)
+            time = torch.tensor([self.vf_estimator.t_min], device=input.device)
+        d = input.shape[-1]
+        # The Jacobian of the score, one backward pass per dimension. Each particle's
+        # score depends only on that particle, for any layout of inputs and conditions.
+        with torch.enable_grad():
+            input_ = input.detach().requires_grad_(True)
+            score = self.vf_estimator.score(input_, condition, time)
+            jac = torch.stack(
+                [
+                    torch.autograd.grad(
+                        score[..., i].sum(), input_, retain_graph=i < d - 1
+                    )[0]
+                    for i in range(d)
+                ],
+                dim=-2,
+            )
+        score = score.detach()
         m = self.vf_estimator.mean_t_fn(time)
         std = self.vf_estimator.std_fn(time)
-        # Standard Tweedie's formula for denoising
-        mu0 = (input_ + std**2 * score) / m
+        mu0 = (input_.detach() + std**2 * score) / m
 
-        # Prior adjustment
-        # NOTE: For now this assumes that sigma0_t2 is at most a vector
-        # representing a diagonal matrix. This has to be adapted if
-        # _sigma0_t2 is changed.
-        sigma0_t2 = self._sigma0_t2(std)
-        sigma0_t2 = sigma0_t2.reshape(-1)
-        if sigma0_t2.numel() == 1:
-            sigma0_t2 = sigma0_t2.expand(mu0.shape[-1])
-        nugget = self.config.nugget
+        # Covariance of theta_0 given theta_t by Tweedie's second-order formula, exact
+        # for Gaussian posteriors; the paper's Eq. (12) assumes the posterior N(0, I).
+        # Floored at zero where an imperfect score makes it indefinite.
+        eye = torch.eye(d, dtype=score.dtype, device=score.device)
+        m_, s2 = ((v * torch.ones_like(score))[..., :1, None] for v in (m, std**2))
+        cov0 = s2 / m_**2 * (eye + s2 * jac)
+        # A nonfinite particle gets a NaN score instead of failing the whole batch.
+        finite = cov0.isfinite().all(-1).all(-1)
+        cov0 = torch.where(finite[..., None, None], cov0, eye)
+        eigenvalues, eigenvectors = torch.linalg.eigh(0.5 * (cov0 + cov0.mT))
+        cov0 = (eigenvectors * eigenvalues.clamp(min=0)[..., None, :]) @ eigenvectors.mT
+
+        weights, means, cov = (
+            p.to(score.dtype) for p in (self.weights, self.means, self.cov)
+        )
         if self.config.covariance_type == "diag":
-            cov_e = self.cov + sigma0_t2 + nugget
-            diff = mu0[..., None, :] - self.means
-            log_det = torch.log(cov_e).sum(-1)
-            quad = (diff**2 / cov_e).sum(-1)
-            d = diff.shape[-1]
-            log_comp = -0.5 * (d * math.log(2 * math.pi) + log_det + quad)
-        else:
-            nugget_eye = nugget * torch.eye(
-                sigma0_t2.shape[-1], device=sigma0_t2.device
-            )
-            cov_e = self.cov + torch.diag_embed(sigma0_t2) + nugget_eye
-            diff = mu0[..., None, :] - self.means
-            chol = torch.linalg.cholesky(cov_e)
-            diff_col = diff[..., None]
-            solve = torch.cholesky_solve(diff_col, chol)
-            quad = (diff_col * solve).sum(-2).squeeze(-1)
-            log_det = 2.0 * torch.log(torch.diagonal(chol, dim1=-2, dim2=-1)).sum(-1)
-            d = diff.shape[-1]
-            log_comp = -0.5 * (d * math.log(2 * math.pi) + log_det + quad)
+            cov = torch.diag_embed(cov)
+        cov_e = cov + cov0[..., None, :, :] + self.config.nugget * eye
+        diff = means - mu0[..., None, :]
+        chol = torch.linalg.cholesky(cov_e)
+        v_i = torch.cholesky_solve(diff[..., None], chol).squeeze(-1)
+        quad = (diff * v_i).sum(-1)
+        log_det = 2.0 * torch.log(torch.diagonal(chol, dim1=-2, dim2=-1)).sum(-1)
+        # Normalized in log space, so that far in the tails they still sum to one.
+        w_tilde = torch.softmax(torch.log(weights) - 0.5 * (log_det + quad), dim=-1)
+        v = (w_tilde[..., None] * v_i).sum(-2)
 
-        numerator = self.weights[None, :] * torch.exp(log_comp)
-        denom = numerator.sum(dim=1, keepdim=True)
-        denom = torch.clamp(denom, min=nugget)
-        w_tilde = numerator / denom
+        # The paper's Eq. (15): v times the derivative of mu0 with respect to theta_t,
+        # (I + std^2 J) / m = m cov0 / std^2.
+        guided = score + (m_ / s2 * cov0 @ v[..., None]).squeeze(-1)
+        return torch.where(finite[..., None], guided, torch.nan)
 
-        diff = self.means - mu0[..., None, :]
-        if self.config.covariance_type == "diag":
-            v_i = diff / cov_e
-        else:
-            # Solve per-component for full covariance; support shared or
-            # per-component cov.
-            v_i = torch.linalg.solve(cov_e, diff.unsqueeze(-1)).squeeze(-1)
 
-        v = torch.sum(w_tilde[..., None] * v_i, dim=-2)
-        mu0_adjusted = mu0 + std**2 * v
-        score_adjusted = (mu0_adjusted * m - input_) / (std**2 + nugget)
+class CombinedIIDScore(ScoreAdaptation):
+    """The score of several iid observations, combined by an iid method.
 
-        return score_adjusted
+    Guidance wrapped around it adjusts the combined posterior once, instead of once
+    per observation.
+    """
+
+    def __init__(
+        self,
+        vf_estimator: ConditionalVectorFieldEstimator,
+        iid_score_fn: "IIDScoreFunction",
+    ) -> None:
+        super().__init__(vf_estimator, iid_score_fn.prior, iid_score_fn.device)
+        self.iid_score_fn = iid_score_fn
+
+    def __call__(
+        self, input: Tensor, condition: Tensor, time: Optional[Tensor] = None
+    ) -> Tensor:
+        return self.iid_score_fn(input, condition, time)
 
 
 class IIDScoreFunction(ABC):
@@ -839,8 +894,11 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
         Args:
             vector_field_estimator: The neural network modelling the score.
             prior: The prior distribution.
-            ensure_lam_psd: Whether to ensure the precision matrix is positive definite.
-            lam_psd_nugget: The nugget value to ensure positive definiteness.
+            ensure_lam_psd: Whether to make the combined precision positive definite
+                where it is not, see `ensure_lam_positive_definite`. Positive
+                definite directions stay unchanged.
+            lam_psd_nugget: The nugget added along directions that are not positive
+                definite, relative to the largest posterior precision.
             device: The device on which to evaluate the potential. Defaults to "cpu".
         """
         super().__init__(vector_field_estimator, prior, device)
@@ -905,23 +963,13 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
         """
         # NOTE: This is for the uniform distribution and distributions that do not
         # implement a log_prob.
+        m = self.vector_field_estimator.mean_t_fn(time)
+        std = self.vector_field_estimator.std_fn(time)
         try:
-            with torch.enable_grad():
-                inputs = inputs.clone().detach().requires_grad_(True)
-                m = self.vector_field_estimator.mean_t_fn(time)
-                std = self.vector_field_estimator.std_fn(time)
-                p = marginalize(self.prior, m, std)
-                log_p = p.log_prob(inputs)
-                prior_score = torch.autograd.grad(
-                    log_p,
-                    inputs,
-                    grad_outputs=torch.ones_like(log_p),
-                    create_graph=True,
-                )[0].detach()
+            marginal_prior = marginalize(self.prior, m, std)
         except Exception:
-            prior_score = torch.zeros_like(inputs)
-
-        return prior_score
+            return torch.zeros_like(inputs)
+        return compute_score(marginal_prior, inputs)
 
     def marginal_denoising_prior_precision_fn(
         self, time: Tensor, inputs: Tensor
@@ -997,7 +1045,8 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
             conditions,
         )
 
-        if self.ensure_lam_psd:
+        # One observation has nothing to combine, and the guard divides by N - 1.
+        if self.ensure_lam_psd and N > 1:
             prior_precision, posterior_precisions = ensure_lam_positive_definite(
                 prior_precision,
                 posterior_precisions,
@@ -1056,7 +1105,7 @@ class GaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         prior: Distribution,
         posterior_precision: Optional[Tensor] = None,
         scale_from_prior_precision: float = 2.0,
-        enable_lam_psd: bool = False,
+        enable_lam_psd: bool = True,
         lam_psd_nugget: float = 0.01,
         device: Union[str, torch.device] = "cpu",
     ) -> None:
@@ -1068,8 +1117,11 @@ class GaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
             posterior_precision: Optional preset posterior precision.
             scale_from_prior_precision: Factor to scale the prior precision by when
                 ``posterior_precision`` is not provided.
-            enable_lam_psd: Whether to ensure the precision matrix is positive definite.
-            lam_psd_nugget: The nugget value to ensure positive definiteness.
+            enable_lam_psd: Whether to make the combined precision positive definite
+                where it is not, see `ensure_lam_positive_definite`. Positive
+                definite directions stay unchanged.
+            lam_psd_nugget: The nugget added along directions that are not positive
+                definite, relative to the largest posterior precision.
             device: The device on which to evaluate the potential. Defaults to "cpu".
         """
         super().__init__(
@@ -1170,8 +1222,11 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         Args:
             vector_field_estimator: The neural network modeling the score.
             prior: The prior distribution.
-            enable_lam_psd: Whether to ensure the precision matrix is positive definite.
-            lam_psd_nugget: The nugget value to ensure positive definiteness.
+            enable_lam_psd: Whether to make the combined precision positive definite
+                where it is not, see `ensure_lam_positive_definite`. Positive
+                definite directions stay unchanged.
+            lam_psd_nugget: The nugget added along directions that are not positive
+                definite, relative to the largest posterior precision.
             precision_est_only_diag: Whether to estimate only the diagonal of the
                 precision matrix.
             precision_est_budget: The budget for the precision estimation.
@@ -1327,7 +1382,23 @@ class JacCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         std = self.vector_field_estimator.std_fn(time)
         cov0 = std**2 * jac + torch.eye(d, device=self.device)[None, None, :, :]
 
-        denoising_posterior_precision = m**2 / std**2 * torch.inverse(cov0)
+        # Narrow posteriors cancel I + s^2 J below float rounding. Those matrices get an
+        # eigenvalue floor, without gradient (eigh's is NaN at repeated eigenvalues).
+        floor = 10 * torch.finfo(cov0.dtype).eps
+        # A nonfinite matrix makes only its score NaN; eigvalsh would fail the batch.
+        finite = cov0.isfinite().all((-2, -1))
+        singular = torch.zeros_like(finite)
+        singular[finite] = (torch.linalg.eigvalsh(cov0[finite]).abs() < floor).any(-1)
+        inverse_cov0 = torch.zeros_like(cov0)
+        inverse_cov0[~singular] = torch.linalg.inv(cov0[~singular])
+        if singular.any():
+            eigenvalues, eigenvectors = torch.linalg.eigh(cov0[singular].detach())
+            eigenvalues = torch.where(eigenvalues.abs() < floor, floor, eigenvalues)
+            inverse_cov0[singular] = (
+                eigenvectors / eigenvalues[..., None, :]
+            ) @ eigenvectors.mT
+
+        denoising_posterior_precision = m**2 / std**2 * inverse_cov0
 
         return denoising_posterior_precision
 
@@ -1345,16 +1416,20 @@ def compute_score(p: Distribution, inputs: Tensor) -> Tensor:
     Returns:
         The score tensor, same shape as ``inputs``.
     """
+    # Differentiable in `inputs` when they require grad, so that the Jacobian of a
+    # combined iid score (prior_guide) includes the prior term.
+    keep_graph = inputs.requires_grad
     try:
         with torch.enable_grad():
-            inputs = inputs.detach().clone().requires_grad_(True)
+            if not keep_graph:
+                inputs = inputs.detach().clone().requires_grad_(True)
             log_prob = p.log_prob(inputs)
             score = torch.autograd.grad(
                 log_prob,
                 inputs,
                 grad_outputs=torch.ones_like(log_prob),
-                create_graph=True,
-            )[0].detach()
+                create_graph=keep_graph,
+            )[0]
     except Exception:
         score = torch.zeros_like(inputs)
     return score
@@ -1367,61 +1442,63 @@ def ensure_lam_positive_definite(
     precision_nugget: float = 0.1,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     r"""
-    Ensure that the matrix is positive definite.
+    Make the combined precision `Lam` positive definite where it is not.
+
+    `Lam` is the sum of the posterior precisions minus `N - 1` prior precisions.
+    Along each eigenvector of `Lam` (each entry of a diagonal `Lam`) whose eigenvalue
+    is not positive, every posterior precision gets the eigenvalue's magnitude divided
+    by `N - 1`, plus a nugget. Positive definite directions stay unchanged, so exact
+    precisions give exact scores.
 
     Args:
         denoising_prior_precision: The prior precision tensor.
         denoising_posterior_precision: The posterior precision tensor.
-        N: The scaling factor used in the correction.
-        precision_nugget: The nugget value to ensure positive definiteness. For a
-            dense `Lam`, the total nugget is at least 100 machine epsilons times
-            the largest absolute eigenvalue of `Lam`, and the nugget per trial is
-            at least one machine epsilon times the largest posterior precision.
-            For a diagonal `Lam`, both bounds hold per diagonal entry.
+        N: The number of observations.
+        precision_nugget: The nugget per observation, relative to the largest
+            posterior precision, so that it does not depend on the scale of the
+            parameters. It is at least 100 machine epsilons times the largest
+            absolute eigenvalue of `Lam`, divided by `N`. For a diagonal `Lam`, both
+            scales are taken per diagonal entry.
 
     Returns:
         A tuple of (denoising_prior_precision, denoising_posterior_precision) where the
-        posterior precision has been adjusted to be positive definite.
+        posterior precision has been adjusted so that `Lam` is positive definite.
     """
     d = denoising_prior_precision.shape[-1]
 
     term1 = (1 - N) * denoising_prior_precision
     term2 = torch.sum(denoising_posterior_precision, axis=1, keepdim=True)  # type: ignore
     Lam = add_diag_or_dense(term1, term2, batch_dims=2)
+    eps = torch.finfo(Lam.dtype).eps
 
-    is_diag = Lam.ndim == 3
-    if d > 1 and not is_diag:
+    dense = d > 1 and Lam.ndim == 4
+    if dense:
         eigenvalues, eigenvectors = torch.linalg.eigh(Lam)
-        corrected_eigs = torch.where(
-            eigenvalues <= 0, -eigenvalues, torch.zeros_like(eigenvalues)
-        )
-        corrected_eigs = corrected_eigs / (N - 1)
-
-        Lam_corr = torch.einsum(
-            '...ij,...j,...kj->...ik', eigenvectors, corrected_eigs, eigenvectors
-        )
-        # The nugget must survive rounding in `Lam` and in each posterior precision.
-        eps = torch.finfo(Lam.dtype).eps
-        nugget = torch.maximum(
-            100 * eps * eigenvalues.abs().amax(-1) / N,
-            eps * denoising_posterior_precision.flatten(1).abs().amax(-1)[..., None],
-        )
-        nugget = torch.clamp(nugget, min=precision_nugget)[..., None, None]
-        Lam_corr += nugget * torch.eye(
-            Lam.shape[-1], device=Lam.device, dtype=Lam.dtype
-        )
-
-        denoising_posterior_precision = add_diag_or_dense(
-            denoising_posterior_precision, Lam_corr, batch_dims=2
-        )
+        eigenvalue_scale = eigenvalues.abs().amax(-1, keepdim=True)
+        posterior_scale = denoising_posterior_precision.flatten(1).abs().amax(-1)
+        posterior_scale = posterior_scale.reshape(-1, 1, 1)
     else:
-        # For one-dimensional case, treat Lam as a vector by putting it on the diagonal.
-        eps = torch.finfo(Lam.dtype).eps
-        nugget = torch.maximum(
-            100 * eps * Lam.abs() / N,
-            eps * denoising_posterior_precision.abs().amax(1, keepdim=True),
-        ).clamp(min=precision_nugget)
-        Lam_corr = torch.where(Lam > 0, torch.zeros_like(Lam), -Lam) / (N - 1) + nugget
-        denoising_posterior_precision = denoising_posterior_precision + Lam_corr
+        # A diagonal Lam, or a 1 x 1 one, is corrected elementwise; the precisions may
+        # mix diagonal and dense layouts.
+        eigenvalues = Lam
+        eigenvalue_scale = Lam.abs()
+        posterior_scale = denoising_posterior_precision.abs().amax(1, True)
+        if posterior_scale.ndim < Lam.ndim:  # diagonal next to a dense 1 x 1
+            posterior_scale = posterior_scale.unsqueeze(-1)
+    # Eigenvalues within rounding of zero count as not positive.
+    tolerance = 100 * eps * torch.maximum(eigenvalue_scale, posterior_scale)
+    nugget = torch.maximum(max(precision_nugget, eps) * posterior_scale, tolerance / N)
+    correction = torch.where(
+        eigenvalues <= tolerance,
+        eigenvalues.abs() / (N - 1) + nugget.clamp(min=eps),
+        torch.zeros_like(eigenvalues),
+    )
+    if dense:
+        correction = torch.einsum(
+            '...ij,...j,...kj->...ik', eigenvectors, correction, eigenvectors
+        )
+    denoising_posterior_precision = add_diag_or_dense(
+        denoising_posterior_precision, correction, batch_dims=2
+    )
 
     return denoising_prior_precision, denoising_posterior_precision

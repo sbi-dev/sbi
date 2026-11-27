@@ -12,6 +12,16 @@
   * Without any draw inside the prior support, `leakage_correction()` returns 0 with a warning, and `log_prob()` returns NaN for theta inside the prior support, per observation. Before, FMPE and NPSE raised a RuntimeError.
   * `RestrictedPrior.log_prob()` stops the same way: `prior_acceptance()` takes `max_num_draws`, by default the larger of `num_rejection_samples` and 1_000_000. Without any accepted draw, `log_prob()` is NaN inside the restriction, with a warning. Before, it could draw forever.
   * `accept_reject_sample()` no longer takes `sample_for_correction_factor`.
+* **Guided and iid sampling of vector field posteriors gives different samples** ([#2111](https://github.com/sbi-dev/sbi/pull/2111)): guidance now uses the score instead of the velocity of FMPE, and iid methods combine the observations before guidance applies. FMPE and Simformer flow matching use the corrected score and diffusion (a factor 1 + `noise_scale`), and all their SDE functions clamp time at `effective_t_max` (0.99), also `score` and `std_fn`. The `gauss` iid method now keeps its combined precision positive definite by default, as `auto_gauss` and `jac_gauss` do. `prior_guide` takes one backward pass per parameter dimension and sampling step, for the Jacobian of the score.
+* **`sample()` raises for ODE sampling with iid data or guidance** ([#2111](https://github.com/sbi-dev/sbi/pull/2111)): the ODE sampler cannot use them and ignored them before. Build the posterior with `sample_with="sde"`.
+
+### ⚠️ Deprecations
+
+* **The per-call `effective_t_max` argument of the flow matching SDE functions** ([#2111](https://github.com/sbi-dev/sbi/pull/2111)): `drift_fn`, `diffusion_fn` and `mean_t_fn` warn when it is passed. Set the attribute `effective_t_max` of the estimator instead, which all SDE functions use.
+
+### 🐛 Bug Fixes
+
+* **Guided and iid sampling of vector field posteriors** ([#2111](https://github.com/sbi-dev/sbi/pull/2111)): iid data with guidance counted the guidance once per observation; `prior_guide` follows its paper for any SDE; interval guidance raises for invalid bounds; the positive definite guard of the iid methods no longer biases the score of well-posed problems, whatever the scale of the parameters; the denoising fallback for priors without a closed form works for priors of two or more dimensions.
 
 ## v0.27.0
 

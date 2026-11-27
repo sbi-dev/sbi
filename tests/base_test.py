@@ -9,8 +9,10 @@ import torch
 
 import sbi.inference
 from sbi import utils
-from sbi.inference import FMPE, NPE, infer
+from sbi.inference import FMPE, NPE, VectorFieldPosterior, infer
+from sbi.inference.posteriors import EnsemblePosterior
 from sbi.inference.trainers import nle, npe, nre
+from sbi.neural_nets import FlowMatchingConfig
 from sbi.utils.removed_names import REMOVED_MODULES, REMOVED_NAMES, RENAMED_METHODS
 
 
@@ -204,6 +206,29 @@ def test_canonical_shorthands_do_not_warn():
         assert sbi.inference.NLE is sbi.inference.NLE_A
         assert sbi.inference.NRE is sbi.inference.NRE_B
     assert {"NPE", "NLE", "NRE", "infer"} <= set(sbi.inference.__all__)
+
+
+def test_vector_field_posterior_ode_rejects_iid_and_guidance():
+    """iid methods and guidance adjust the score, which ODE sampling does not use. An
+    ensemble raises as well, also when it would not draw its ODE posterior."""
+    theta, x = torch.randn(20, 2), torch.randn(20, 2)
+    estimator = FlowMatchingConfig().build(theta, x)
+    prior = utils.BoxUniform(-torch.ones(2), torch.ones(2))
+    posterior = VectorFieldPosterior(estimator, prior, sample_with="ode")
+    sde_posterior = VectorFieldPosterior(estimator, prior, sample_with="sde")
+    ensemble = EnsemblePosterior([sde_posterior, posterior], weights=[1.0, 0.0])
+    potential_fn = posterior.potential_fn
+
+    for sampled in (posterior, ensemble):
+        with pytest.raises(ValueError, match="per observation.*ignores guidance"):
+            sampled.sample(
+                (1,),
+                x=torch.zeros(3, 2),
+                guidance_method="interval",
+                guidance_params={},
+                show_progress_bars=False,
+            )
+    assert posterior.potential_fn is potential_fn, "A rejected call keeps the binding."
 
 
 @pytest.mark.parametrize(

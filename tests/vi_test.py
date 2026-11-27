@@ -846,10 +846,6 @@ def test_elbo_differentiates_a_vector_field_potential():
     estimator = posterior_flow_nn(hidden_features=8, num_layers=1)(
         theta, theta + 0.1 * torch.randn_like(theta)
     )
-    potentials = {
-        "vector field": VectorFieldPosterior(estimator, prior).potential_fn,
-        "zero": _ZeroPotential(prior),
-    }
 
     def location_gradient(potential_fn):
         torch.manual_seed(0)
@@ -866,8 +862,8 @@ def test_elbo_differentiates_a_vector_field_potential():
         return torch.autograd.grad(surrogate, next(q.parameters()))[0]
 
     assert not torch.allclose(
-        location_gradient(potentials["vector field"]),
-        location_gradient(potentials["zero"]),
+        location_gradient(VectorFieldPosterior(estimator, prior).potential_fn),
+        location_gradient(_ZeroPotential(prior)),
     )
 
 
@@ -1526,7 +1522,7 @@ def _fast_amortized_posterior():
     posterior = VIPosterior(FakePotential(prior=prior), prior=prior)
     posterior.train_amortized(
         theta=theta,
-        x=theta + 0.1 * torch.randn_like(theta),
+        x=theta,
         max_num_iters=3,
         show_progress_bar=False,
         num_transforms=1,
@@ -1536,7 +1532,7 @@ def _fast_amortized_posterior():
 
 
 def test_amortized_vi_takes_one_observation():
-    """Amortized q, like a direct posterior, takes one observation in `sample()`,
+    """Amortized q, alone or in an ensemble, takes one observation in `sample()`,
     `log_prob()` and `potential()`, instead of one posterior per observation or iid
     trials."""
     posterior, _ = _fast_amortized_posterior()
@@ -1547,6 +1543,8 @@ def test_amortized_vi_takes_one_observation():
         posterior.log_prob(zeros(3, 2), x=x_3)
     with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
         posterior.potential(zeros(4, 2), x=x_3)
+    with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
+        EnsemblePosterior([posterior, posterior]).log_prob(zeros(3, 2), x=x_3)
 
 
 def test_amortized_vi_checks_a_default_x_set_before_training():
@@ -1584,7 +1582,7 @@ def test_amortized_vi_log_prob_batched_matches_log_prob():
 
 def test_amortized_vi_ignores_the_x_of_an_earlier_single_x_fit():
     """Amortized q(theta|x) needs an x; it ignores the x and the MAP of a stale
-    single-x fit."""
+    single-x fit, and a later single-x fit takes several observations again."""
     prior = MultivariateNormal(zeros(2), eye(2))
     theta = prior.sample((100,))
     posterior = VIPosterior(FakePotential(prior=prior), prior, q="gaussian")
@@ -1601,22 +1599,6 @@ def test_amortized_vi_ignores_the_x_of_an_earlier_single_x_fit():
     assert posterior._map is None
     with pytest.raises(ValueError, match="Context `x` needed"):
         posterior.sample((5,))
-
-
-def test_single_x_fit_after_an_amortized_fit_takes_several_observations():
-    """While an amortized q is in place, the posterior takes one observation, but
-    `train(x)` fits a single-x q to all observations in x."""
-    prior = MultivariateNormal(zeros(2), eye(2))
-    theta = prior.sample((100,))
-    posterior = VIPosterior(FakePotential(prior=prior), prior, q="gaussian")
-    posterior.train_amortized(
-        theta=theta,
-        x=theta,
-        max_num_iters=3,
-        show_progress_bar=False,
-        num_transforms=1,
-        hidden_features=8,
-    )
     posterior.train(x=zeros(3, 2), **TRAIN_KWARGS)
     assert posterior.sample((5,)).shape == (5, 2)
 
@@ -1828,25 +1810,6 @@ def test_ensemble_of_vi_fits_to_different_x_raises():
     weighted = EnsemblePosterior(fits, weights=[1.0, 0.0])
     with pytest.raises(ValueError, match="not fit on the specified observation"):
         weighted.sample((5,), x=2 * ones(1, 2))
-
-
-def test_ensemble_of_amortized_vi_takes_one_observation_in_log_prob():
-    """`log_prob()` of the ensemble raises like `sample()`, instead of pairing each
-    theta with one observation."""
-    prior = MultivariateNormal(zeros(2), eye(2))
-    theta = prior.sample((100,))
-    posterior = VIPosterior(FakePotential(prior=prior), prior, q="gaussian")
-    posterior.train_amortized(
-        theta=theta,
-        x=theta,
-        max_num_iters=3,
-        show_progress_bar=False,
-        num_transforms=1,
-        hidden_features=8,
-    )
-    ensemble = EnsemblePosterior([posterior, posterior])
-    with pytest.raises(ValueError, match="takes one observation, but x holds 3"):
-        ensemble.log_prob(zeros(3, 2), x=zeros(3, 2))
 
 
 def test_evaluate_scores_q_at_the_x_it_was_fit_to(capsys):

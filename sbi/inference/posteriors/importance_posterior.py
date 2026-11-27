@@ -329,11 +329,14 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         init_method: Union[str, Tensor],
         num_init_samples: int,
         x: Optional[Tensor] = None,
+        show_progress_bars: bool = False,
     ) -> Tensor:
         # With method="importance", `.sample()` returns weighted proposal samples.
         if init_method == "posterior":
-            return self._sir_sample((num_init_samples,))
-        return super()._map_inits(init_method, num_init_samples, x)
+            return self._sir_sample(
+                (num_init_samples,), show_progress_bars=show_progress_bars
+            )
+        return super()._map_inits(init_method, num_init_samples, x, show_progress_bars)
 
     def map(
         self,

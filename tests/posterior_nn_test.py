@@ -1021,11 +1021,8 @@ def test_ensemble_mixture_takes_one_observation(method, estimator, request):
         calls[method]()
 
 
-@pytest.mark.parametrize(
-    "method", ["sample", "log_prob", "potential", "map_individually"]
-)
 def test_ensemble_raises_when_its_posteriors_use_different_observations(
-    method, npe_for_iid_x
+    npe_for_iid_x,
 ):
     """Without an x of its own, the ensemble would mix posteriors of different
     observations."""
@@ -1034,15 +1031,14 @@ def test_ensemble_raises_when_its_posteriors_use_different_observations(
     components[0].set_default_x(zeros(1, 2))
     components[1].set_default_x(ones(1, 2))
     posterior = EnsemblePosterior(components)
-    theta = zeros(4, 2)
-    calls = {
-        "sample": lambda: posterior.sample((5,), show_progress_bars=False),
-        "log_prob": lambda: posterior.log_prob(theta),
-        "potential": lambda: posterior.potential(theta),
-        "map_individually": lambda: posterior.map(individually=True, num_iter=2),
-    }
     with pytest.raises(ValueError, match="do not all use the same observation"):
-        calls[method]()
+        posterior.sample((5,), show_progress_bars=False)
+    with pytest.raises(ValueError, match="do not all use the same observation"):
+        posterior.log_prob(zeros(4, 2))
+    with pytest.raises(ValueError, match="do not all use the same observation"):
+        posterior.potential(zeros(4, 2))
+    with pytest.raises(ValueError, match="do not all use the same observation"):
+        posterior.map(individually=True, num_iter=2)
 
 
 def test_ensemble_evaluates_its_posteriors_at_its_default_x(npe_for_iid_x):

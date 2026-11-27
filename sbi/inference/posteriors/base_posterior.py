@@ -251,9 +251,7 @@ class NeuralPosterior:
         that calls like `posterior.set_default_x(my_x).sample((1000,))` are possible.
 
         Several observations, of shape `(num_observations, *x_event_shape)`, are iid
-        trials. Posteriors that sample with a potential combine them; methods that
-        take one observation raise and name the alternatives. The how-to guide on iid
-        observations lists which posterior does what.
+        trials (see the how-to guide on iid observations).
 
         Args:
             x: The default observation to set for the posterior $p(\theta|x)$.
@@ -292,11 +290,12 @@ class NeuralPosterior:
         if hint is not None:
             _require_one_observation(num_observations, type(self).__name__, hint)
 
-    def _check_x(self, x: Tensor) -> None:
+    def _check_x(self, x: Tensor, **kwargs: Any) -> None:
         """Raise if this posterior cannot answer for the processed `x`.
 
         The default accepts any `x`. Posteriors with further conditions on `x` override
-        it, so that an ensemble can check all components before it draws one.
+        it, so that an ensemble can check all components before it draws one. `kwargs`
+        holds the options of `sample()`.
         """
 
     def _bind_iid(
@@ -428,6 +427,7 @@ class NeuralPosterior:
         init_method: Union[str, Tensor],
         num_init_samples: int,
         x: Optional[Tensor] = None,
+        show_progress_bars: bool = False,
     ) -> Tensor:
         """Returns the starting points of the MAP optimization.
 
@@ -436,10 +436,13 @@ class NeuralPosterior:
                 `map()` of the child classes.
             num_init_samples: Number of samples to draw for a string `init_method`.
             x: Observation for `posterior` samples. If None, the default `x`.
+            show_progress_bars: Whether to show a progress bar while sampling.
         """
         has_proposal = getattr(self, "proposal", None) is not None
         if init_method == "posterior":
-            return self.sample((num_init_samples,), x=x)
+            return self.sample(
+                (num_init_samples,), x=x, show_progress_bars=show_progress_bars
+            )
         elif init_method == "proposal":
             if not has_proposal:
                 raise ValueError(
@@ -470,7 +473,9 @@ class NeuralPosterior:
         """Calculates the maximum-a-posteriori estimate (MAP).
         See `map()` method of child classes for docstring.
         """
-        inits = self._map_inits(init_method, num_init_samples)
+        inits = self._map_inits(
+            init_method, num_init_samples, show_progress_bars=show_progress_bars
+        )
         # Read after `_map_inits()`, whose `sample()` may rebind the potential.
         return gradient_ascent(
             potential_fn=self.potential_fn,
@@ -670,7 +675,6 @@ def _normalize_by_support_mass(log_prob: Tensor, mass: Tensor) -> Tensor:
     return torch.where(mass > 0, log_prob - mass.log(), undefined)
 
 
-# Advice shared by the errors of posteriors that take one observation.
 _ONE_AT_A_TIME = (
     "For a separate posterior of each observation, pass one observation at a time"
 )
@@ -683,9 +687,6 @@ _IID_SAMPLERS = (
 def _require_one_observation(num_observations: int, subject: str, hint: str) -> None:
     """Raise a ValueError if `subject`, which takes one observation, gets another
     number of observations.
-
-    Every posterior method that takes one observation raises through this function,
-    so that all of them give the same message.
 
     Args:
         num_observations: Number of observations in `x`.

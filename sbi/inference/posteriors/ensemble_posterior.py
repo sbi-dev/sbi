@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import List, Optional, Self, Tuple, Union
+from typing import Any, List, Optional, Self, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -286,7 +286,7 @@ class EnsemblePosterior(NeuralPosterior):
         # depend on the draw.
         x = self._x_else_default_x(x)
         self._check_num_observations(x.shape[0])
-        self._check_x(x)
+        self._check_x(x, **kwargs)
         num_samples = torch.Size(sample_shape).numel()
         posterior_indizes = torch.multinomial(
             self._weights, num_samples, replacement=True
@@ -422,10 +422,10 @@ class EnsemblePosterior(NeuralPosterior):
 
         return self
 
-    def _check_x(self, x: Tensor) -> None:
+    def _check_x(self, x: Tensor, **kwargs: Any) -> None:
         """Raise unless every component, including nested ensembles, can take `x`."""
         for posterior in self.posteriors:
-            posterior._check_x(posterior._process_x(x))
+            posterior._check_x(posterior._process_x(x), **kwargs)
 
     def _check_mixture_observations(self, num_observations: int, method: str) -> None:
         """Raise if a weighted mixture of NPE or vector field components gets several
@@ -574,7 +574,9 @@ class EnsemblePosterior(NeuralPosterior):
 
         else:
             x = self._bind_mixture(None, "map")
-            inits = self._map_inits(init_method, num_init_samples, x)
+            inits = self._map_inits(
+                init_method, num_init_samples, x, show_progress_bars
+            )
             # Read after `_map_inits()`, whose `sample()` may rebind the potential.
             return gradient_ascent(
                 potential_fn=self.potential_fn,

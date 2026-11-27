@@ -3,7 +3,7 @@
 
 import math
 import warnings
-from typing import Dict, Literal, Optional, Tuple, Union
+from typing import Any, Dict, Literal, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -110,23 +110,39 @@ class VectorFieldPosterior(NeuralPosterior):
         self._purpose = """It samples from the vector field model given the \
             vector_field_estimator."""
 
-    def _check_x(self, x: Tensor) -> None:
-        """Raise if this posterior cannot sample several observations as iid trials.
+    def _check_x(
+        self, x: Tensor, guidance_method: Optional[str] = None, **kwargs: Any
+    ) -> None:
+        """Raise if this posterior cannot sample `x`, with guidance if requested.
 
-        Iid trials need the SDE sampler, and composed standardization does not support
-        them yet.
+        Iid trials and guidance need the SDE sampler, and composed standardization does
+        not support them yet.
         """
-        if self.vector_field_estimator.compose_enabled and x.shape[0] > 1:
+        is_iid = x.shape[0] > 1
+        if self.vector_field_estimator.compose_enabled and (
+            is_iid or guidance_method is not None
+        ):
             raise NotImplementedError(
-                "compose_standardization does not yet support iid (x with batch>1). "
-                "Use a single observation, or disable compose_standardization."
+                "compose_standardization does not yet support iid (x with batch>1) "
+                "or guided sampling. Use a single observation without guidance, or "
+                "disable compose_standardization."
             )
-        if x.shape[0] > 1 and self.sample_with == "ode":
-            raise ValueError(
+        if self.sample_with != "ode":
+            return
+        reasons = []
+        if is_iid:
+            reasons.append(
                 "The ODE sampler draws one posterior per observation. Use "
                 "sample_with='sde' to sample several observations as iid trials, or "
                 "`sample_batched()` for one posterior per observation."
             )
+        if guidance_method is not None:
+            reasons.append(
+                f"The ODE sampler ignores guidance ('{guidance_method}'), which "
+                "adjusts the score. Use sample_with='sde' for guided sampling."
+            )
+        if reasons:
+            raise ValueError(" ".join(reasons))
 
     def sample(
         self,
@@ -181,19 +197,21 @@ class VectorFieldPosterior(NeuralPosterior):
                 "auto_gauss" for these reasons. Note that in order to use the iid
                 method, the vector field estimator must support it and have
                 SCORE_DEFINED and MARGINALS_DEFINED class attributes set to True.
+                iid methods need a posterior built with `sample_with="sde"`.
             iid_params: Additional parameters passed to the iid method. See the specific
                 `IIDScoreFunction` child class for details.
             guidance_method: Method to guide the diffusion process. If None, no guidance
-                is used. Currently we support `affine_classifier_free`, which allows to
-                scale and shift the "likelihood" or "prior" score contribution. This can
-                be used to perform "super" conditioning i.e. shrink the variance of the
-                likelihood. `Universal` can be used to guide the diffusion process with
-                a general guidance function. `Interval` is an instance of that where
-                the guidance function constraints the diffusion process to a given
-                interval.
-            guidance_params: Additional parameters passed to the guidance method. See
-                the specific `ScoreAdaptation` child class for details, specifically
-                `AffineClassifierFreeCfg`, `UniversalCfg`, and `IntervalCfg`.
+                is used. `affine_classifier_free` scales and shifts the "likelihood" or
+                "prior" score contribution, e.g. to shrink the variance of the
+                likelihood ("super" conditioning). `universal` guides the diffusion
+                process with a general guidance function. `interval` is an instance of
+                that, which constrains the parameters to given bounds. `prior_guide`
+                replaces the training prior with another prior. Guidance needs a
+                posterior built with `sample_with="sde"`.
+            guidance_params: Additional parameters passed to the guidance method, as
+                the method's config class: `AffineClassifierFreeGuidanceConfig`,
+                `UniversalGuidanceConfig`, `IntervalGuidanceConfig` or
+                `PriorGuideConfig`.
             max_sampling_batch_size: Maximum batch size for sampling.
                 If not provided, uses the value specified at initialization.
             show_progress_bars: Whether to show a progress bar during sampling.
@@ -213,14 +231,8 @@ class VectorFieldPosterior(NeuralPosterior):
         """
 
         x = self._x_else_default_x(x)
-        self._check_x(x)
+        self._check_x(x, guidance_method=guidance_method)
         is_iid = x.shape[0] > 1
-        # Guidance requires transforming the prior to standardized space.
-        if self.vector_field_estimator.compose_enabled and guidance_method is not None:
-            raise NotImplementedError(
-                "compose_standardization does not yet support guided sampling. "
-                "Disable compose_standardization."
-            )
         self.potential_fn = self.potential_fn.bind(
             x,
             x_is_iid=is_iid,
@@ -802,7 +814,11 @@ class VectorFieldPosterior(NeuralPosterior):
             )
             self._map = gradient_ascent(
                 potential_fn=callable_potential_fn,
-                inits=self._map_inits(init_method, num_init_samples),
+                inits=self._map_inits(
+                    init_method,
+                    num_init_samples,
+                    show_progress_bars=show_progress_bars,
+                ),
                 theta_transform=self.theta_transform,
                 num_iter=num_iter,
                 num_to_optimize=num_to_optimize,

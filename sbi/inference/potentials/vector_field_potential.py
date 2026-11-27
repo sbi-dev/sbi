@@ -11,6 +11,7 @@ from zuko.distributions import NormalizingFlow
 
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.vector_field_adaptor import (
+    CombinedIIDScore,
     get_guidance_method,
     get_iid_method,
 )
@@ -128,6 +129,7 @@ class VectorFieldBasedPotential(BasePotential):
             Self for method chaining.
         """
         super().to(device)
+        self.__dict__.pop("_guided_estimators", None)
         self.vector_field_estimator.to(self.device)
         self.neural_ode.to(self.device)
         # Cached flows hold x_o and the ODE's base distribution of the old device.
@@ -187,6 +189,7 @@ class VectorFieldBasedPotential(BasePotential):
         self.iid_params = bound.iid_params
         self.guidance_method = bound.guidance_method
         self.guidance_params = bound.guidance_params
+        self.__dict__.pop("_guided_estimators", None)
         self._flow_kwargs = bound._flow_kwargs
         if not bound._x_is_iid and (bound._x_o is not None):
             self.flow = bound.flow
@@ -314,6 +317,12 @@ class VectorFieldBasedPotential(BasePotential):
             )
             return masked_log_prob
 
+    def __getstate__(self) -> Dict[str, Any]:
+        # Guided estimators may hold local functions; they are rebuilt on first use.
+        state = self.__dict__.copy()
+        state.pop("_guided_estimators", None)
+        return state
+
     def gradient(
         self,
         theta: Tensor,
@@ -345,7 +354,7 @@ class VectorFieldBasedPotential(BasePotential):
 
         if time is None:
             time = torch.tensor([self.vector_field_estimator.t_min])
-        assert time is not None
+        time = time.to(device)
 
         if self._x_o is None:
             raise ValueError(
@@ -353,39 +362,43 @@ class VectorFieldBasedPotential(BasePotential):
                 "the potential or manually set self._x_o."
             )
 
-        if self.guidance_method is not None:
-            score_wrapper, config_cls = get_guidance_method(self.guidance_method)
-            config_params = config_cls(**(self.guidance_params or {}))
-            # Note to make this cross compatible with IID we need make this
-            # wrapper more like a proper estimator.
-            vf_estimator = score_wrapper(
-                self.vector_field_estimator,
-                self.prior,
-                config=config_params,
-                device=device,
-            )
+        if self.guidance_method is None:
+            vf_estimator = self._combined_estimator(device)
         else:
-            vf_estimator = self.vector_field_estimator
+            # Reused at every step, so that auto_gauss and prior_guide keep their
+            # estimates.
+            guided = self.__dict__.setdefault("_guided_estimators", {})
+            if device not in guided:
+                score_wrapper, config_cls = get_guidance_method(self.guidance_method)
+                guided[device] = score_wrapper(
+                    self._combined_estimator(device),
+                    self.prior,
+                    config=config_cls(**(self.guidance_params or {})),
+                    device=device,
+                )
+            vf_estimator = guided[device]
 
         with torch.set_grad_enabled(track_gradients):
-            if self.num_iid_observations == 1:
-                score = vf_estimator.score(
-                    input=theta, condition=self.x_o, t=time.to(device)
-                )
-            else:
-                assert self.prior is not None, "Prior is required for iid methods."
+            return vf_estimator.score(input=theta, condition=self.x_o, t=time)
 
-                iid_method = get_iid_method(self.iid_method)
-                score_fn_iid = iid_method(
-                    vf_estimator,
-                    self.prior,
-                    device=device,
-                    **(self.iid_params or {}),
-                )
-
-                score = score_fn_iid(theta, self.x_o, time)
-
-        return score
+    def _combined_estimator(
+        self, device: Union[str, torch.device]
+    ) -> Union[ConditionalVectorFieldEstimator, CombinedIIDScore]:
+        """Return the estimator, or for several iid observations their combined score,
+        which guidance then adjusts once."""
+        if self.num_iid_observations == 1:
+            return self.vector_field_estimator
+        assert self.prior is not None, "Prior is required for iid methods."
+        iid_method = get_iid_method(self.iid_method)
+        return CombinedIIDScore(
+            self.vector_field_estimator,
+            iid_method(
+                self.vector_field_estimator,
+                self.prior,
+                device=device,
+                **(self.iid_params or {}),
+            ),
+        )
 
     def rebuild_flow(self, **kwargs) -> NormalizingFlow:
         """

@@ -6,6 +6,7 @@ from copy import deepcopy
 from dataclasses import dataclass, replace
 from typing import (
     TYPE_CHECKING,
+    Any,
     Callable,
     Dict,
     Iterable,
@@ -630,7 +631,7 @@ class VIPosterior(NeuralPosterior):
         self._optimizer_builder = get_VI_method(method)
         return self
 
-    def _check_x(self, x: Tensor) -> None:
+    def _check_x(self, x: Tensor, **kwargs: Any) -> None:
         """Raise if `x` is not the one observation this q answers for."""
         if self._mode == "amortized":
             self._check_num_observations(x.shape[0])
@@ -1488,11 +1489,14 @@ class VIPosterior(NeuralPosterior):
         init_method: Union[str, TorchTensor],
         num_init_samples: int,
         x: Optional[TorchTensor] = None,
+        show_progress_bars: bool = False,
     ) -> Tensor:
         # Amortized training leaves `q` untouched, so draw from q(θ|x).
         if self._mode == "amortized" and init_method in ("posterior", "proposal"):
-            return self.sample((num_init_samples,), x=x)
-        return super()._map_inits(init_method, num_init_samples, x)
+            return self.sample(
+                (num_init_samples,), x=x, show_progress_bars=show_progress_bars
+            )
+        return super()._map_inits(init_method, num_init_samples, x, show_progress_bars)
 
     def map(
         self,
