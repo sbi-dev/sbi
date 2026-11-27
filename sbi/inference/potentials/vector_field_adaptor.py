@@ -407,15 +407,20 @@ class IntervalGuidanceConfig:
                     f"{name}_bound must not be NaN or {-no_wall}: {no_wall} means no "
                     "bound."
                 )
-        if (
-            lower is not None
-            and upper is not None
-            and not torch.as_tensor(lower < upper).all()
-        ):
-            raise ValueError(
-                f"lower_bound ({self.lower_bound}) must be less than "
-                f"upper_bound ({self.upper_bound})."
-            )
+        if lower is not None and upper is not None:
+            lower, upper = torch.as_tensor(lower), torch.as_tensor(upper)
+            try:
+                torch.broadcast_shapes(lower.shape, upper.shape)
+            except RuntimeError as err:
+                raise ValueError(
+                    f"lower_bound of shape {tuple(lower.shape)} and upper_bound of "
+                    f"shape {tuple(upper.shape)} do not broadcast."
+                ) from err
+            if not (lower < upper).all():
+                raise ValueError(
+                    f"lower_bound ({self.lower_bound}) must be less than "
+                    f"upper_bound ({self.upper_bound})."
+                )
 
 
 @register_guidance_method("interval", IntervalGuidanceConfig)

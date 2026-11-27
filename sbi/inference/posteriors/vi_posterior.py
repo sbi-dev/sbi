@@ -6,6 +6,7 @@ from copy import deepcopy
 from dataclasses import dataclass, replace
 from typing import (
     TYPE_CHECKING,
+    Any,
     Callable,
     Dict,
     Iterable,
@@ -621,7 +622,7 @@ class VIPosterior(NeuralPosterior):
         self._optimizer_builder = get_VI_method(method)
         return self
 
-    def _check_x(self, x: Tensor, **kwargs) -> None:
+    def _check_x(self, x: Tensor, **kwargs: Any) -> None:
         """Raise if `x` is not the one observation this q answers for."""
         if self._mode == "amortized":
             self._check_num_observations(x.shape[0])

@@ -290,7 +290,7 @@ class NeuralPosterior:
         if hint is not None:
             _require_one_observation(num_observations, type(self).__name__, hint)
 
-    def _check_x(self, x: Tensor, **kwargs) -> None:
+    def _check_x(self, x: Tensor, **kwargs: Any) -> None:
         """Raise if this posterior cannot answer for the processed `x`.
 
         The default accepts any `x`. Posteriors with further conditions on `x` override

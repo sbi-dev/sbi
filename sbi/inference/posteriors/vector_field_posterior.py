@@ -3,7 +3,7 @@
 
 import math
 import warnings
-from typing import Dict, Literal, Optional, Union
+from typing import Any, Dict, Literal, Optional, Union
 
 import torch
 from torch import Tensor
@@ -111,7 +111,7 @@ class VectorFieldPosterior(NeuralPosterior):
             vector_field_estimator."""
 
     def _check_x(
-        self, x: Tensor, guidance_method: Optional[str] = None, **kwargs
+        self, x: Tensor, guidance_method: Optional[str] = None, **kwargs: Any
     ) -> None:
         """Raise if this posterior cannot sample `x`, with guidance if requested.
 
@@ -127,17 +127,22 @@ class VectorFieldPosterior(NeuralPosterior):
                 "or guided sampling. Use a single observation without guidance, or "
                 "disable compose_standardization."
             )
-        if is_iid and self.sample_with == "ode":
-            raise ValueError(
+        if self.sample_with != "ode":
+            return
+        reasons = []
+        if is_iid:
+            reasons.append(
                 "The ODE sampler draws one posterior per observation. Use "
                 "sample_with='sde' to sample several observations as iid trials, or "
                 "`sample_batched()` for one posterior per observation."
             )
-        if guidance_method is not None and self.sample_with == "ode":
-            raise ValueError(
+        if guidance_method is not None:
+            reasons.append(
                 f"The ODE sampler ignores guidance ('{guidance_method}'), which "
                 "adjusts the score. Use sample_with='sde' for guided sampling."
             )
+        if reasons:
+            raise ValueError(" ".join(reasons))
 
     def sample(
         self,
@@ -196,16 +201,17 @@ class VectorFieldPosterior(NeuralPosterior):
             iid_params: Additional parameters passed to the iid method. See the specific
                 `IIDScoreFunction` child class for details.
             guidance_method: Method to guide the diffusion process. If None, no guidance
-                is used. Currently we support `affine_classifier_free`, which allows to
-                scale and shift the "likelihood" or "prior" score contribution. This can
-                be used to perform "super" conditioning i.e. shrink the variance of the
-                likelihood. `Universal` can be used to guide the diffusion process with
-                a general guidance function. `Interval` is an instance of that where
-                the guidance function constraints the diffusion process to a given
-                interval. Guidance needs a posterior built with `sample_with="sde"`.
-            guidance_params: Additional parameters passed to the guidance method. See
-                the specific `ScoreAdaptation` child class for details, specifically
-                `AffineClassifierFreeCfg`, `UniversalCfg`, and `IntervalCfg`.
+                is used. `affine_classifier_free` scales and shifts the "likelihood" or
+                "prior" score contribution, e.g. to shrink the variance of the
+                likelihood ("super" conditioning). `universal` guides the diffusion
+                process with a general guidance function. `interval` is an instance of
+                that, which constrains the parameters to given bounds. `prior_guide`
+                replaces the training prior with another prior. Guidance needs a
+                posterior built with `sample_with="sde"`.
+            guidance_params: Additional parameters passed to the guidance method, as
+                the method's config class: `AffineClassifierFreeGuidanceConfig`,
+                `UniversalGuidanceConfig`, `IntervalGuidanceConfig` or
+                `PriorGuideConfig`.
             max_sampling_batch_size: Maximum batch size for sampling.
                 If not provided, uses the value specified at initialization.
             show_progress_bars: Whether to show a progress bar during sampling.

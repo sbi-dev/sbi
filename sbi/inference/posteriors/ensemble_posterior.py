@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import List, Optional, Self, Tuple, Union
+from typing import Any, List, Optional, Self, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -422,7 +422,7 @@ class EnsemblePosterior(NeuralPosterior):
 
         return self
 
-    def _check_x(self, x: Tensor, **kwargs) -> None:
+    def _check_x(self, x: Tensor, **kwargs: Any) -> None:
         """Raise unless every component, including nested ensembles, can take `x`."""
         for posterior in self.posteriors:
             posterior._check_x(posterior._process_x(x), **kwargs)
