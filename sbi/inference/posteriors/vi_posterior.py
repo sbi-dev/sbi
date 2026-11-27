@@ -921,6 +921,9 @@ class VIPosterior(NeuralPosterior):
                 scheduler: A PyTorch learning rate scheduler. See
                     `DivergenceOptimizer` for details.
                 alpha: Only used if vi_method=`alpha`. Determines the alpha divergence.
+                    With a `RestrictedPrior` or a potential that is -inf inside the
+                    prior's support, use alpha < 1: for alpha >= 1 every step with
+                    a particle there rolls back.
                 K: Only used if vi_method=`IW`. Determines the number of importance
                     weighted particles.
                 stick_the_landing: If one should use the STL estimator (only for rKL,

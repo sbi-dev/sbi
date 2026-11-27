@@ -738,11 +738,11 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
             alpha: Determines the alpha divergence to which is used. For alpha < 1 the
                 divergence is more mass covering, for alpha > 1 the divergence is more
                 mode seeking.
-            unbiased: Deprecated, will be removed. Instead of the biased estimate of
-                the bound [1], use an unbiased estimate of exp((1 - alpha) * bound).
-                Its gradient is the biased one, scaled by (1 - alpha) times that
-                estimate, so the step size depends on the potential's normalizing
-                constant. Only for alpha < 1.
+            unbiased: Deprecated since v0.28.0, removed in v0.30.0. Instead of the
+                biased estimate of the bound [1], use an unbiased estimate of
+                exp((1 - alpha) * bound). Its gradient is the biased one, scaled by
+                (1 - alpha) times that estimate, so the step size depends on the
+                potential's normalizing constant. Only for alpha < 1.
             dreg: Doubly reparmeterized gradient estimator as proposed in [2]. It is
                 based on the `reduced_variance` already present, but leads to an
                 unbiased estimate on this objective in contrast.
@@ -785,9 +785,10 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
                 "alpha > 1 the estimate can be infinite, for alpha = 1 constant."
             )
         warnings.warn(
-            "`unbiased=True` is deprecated and will be removed: its gradient is the "
-            "biased one, scaled by a factor that overflows or underflows for "
-            "unnormalized potentials. Use `unbiased=False`.",
+            "`unbiased=True` is deprecated since sbi v0.28.0 and will be removed in "
+            "v0.30.0: its gradient is the biased one, scaled by a factor that "
+            "overflows or underflows for unnormalized potentials. Use "
+            "`unbiased=False`.",
             FutureWarning,
             stacklevel=2,
         )
