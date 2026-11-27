@@ -8,7 +8,10 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.inference.posteriors.base_posterior import _ONE_AT_A_TIME
+from sbi.inference.posteriors.base_posterior import (
+    _ONE_AT_A_TIME,
+    _require_one_observation,
+)
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.neural_nets.estimators.tabpfn_flow import TabPFNFlow
 from sbi.sbi_types import Shape
@@ -216,6 +219,45 @@ class FilteredDirectPosterior(DirectPosterior):
             norm_posterior=norm_posterior,
             track_gradients=track_gradients,
             leakage_correction_params=leakage_correction_params,
+        )
+
+    def potential(
+        self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
+    ) -> Tensor:
+        r"""Evaluate the potential after setting context for `x`.
+
+        Takes the arguments of `DirectPosterior.potential()`.
+        """
+        self._set_context_for_x_o(self._x_else_default_x(x))
+        return super().potential(theta, x, track_gradients)
+
+    def leakage_correction(
+        self,
+        x: Tensor,
+        num_rejection_samples: int = 10_000,
+        force_update: bool = False,
+        show_progress_bars: bool = False,
+        rejection_sampling_batch_size: int = 10_000,
+        max_num_draws: Optional[int] = None,
+    ) -> Tensor:
+        """Estimate the leakage correction factor after setting context for `x`.
+
+        Takes the arguments of `DirectPosterior.leakage_correction()`.
+        """
+        x_for_context = self._x_else_default_x(x)
+        _require_one_observation(
+            x_for_context.shape[0],
+            "`leakage_correction()` of NPE-PFN",
+            self._one_observation_hint,
+        )
+        self._set_context_for_x_o(x_for_context)
+        return super().leakage_correction(
+            x,
+            num_rejection_samples,
+            force_update,
+            show_progress_bars,
+            rejection_sampling_batch_size,
+            max_num_draws,
         )
 
     def log_prob_batched(

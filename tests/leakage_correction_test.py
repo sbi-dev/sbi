@@ -11,6 +11,7 @@ import torch
 from sbi.inference import DirectPosterior, VectorFieldPosterior
 from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
 from sbi.neural_nets import posterior_flow_nn, posterior_nn, posterior_score_nn
+from sbi.samplers.rejection.rejection import count_accepted
 from sbi.utils import BoxUniform
 from sbi.utils.torchutils import process_device
 from tests.test_utils import mps_fallback_disabled
@@ -30,19 +31,95 @@ def _posterior(estimator_type: str, prior, device: str = "cpu"):
     return posterior_class[estimator_type](estimator, prior, device=device)
 
 
-@pytest.mark.parametrize("estimator_type", ["flow", "score"])
+@pytest.mark.parametrize("estimator_type", ["direct", "flow", "score"])
 def test_log_prob_is_normalized_inside_bounded_prior(estimator_type):
     """`exp(log_prob)` must integrate to one over a box that cuts off most mass."""
     prior = BoxUniform(torch.zeros(2), 3 * torch.ones(2))
     posterior = _posterior(estimator_type, prior).set_default_x(torch.zeros(1, 2))
 
-    theta = prior.sample((20_000,))
-    volume = 9.0
-    integral = volume * posterior.log_prob(theta).exp().mean()
-    uncorrected = volume * posterior.log_prob(theta, norm_posterior=False).exp().mean()
+    num_cells = 60
+    midpoints = (torch.arange(num_cells) + 0.5) * 3 / num_cells
+    grid = torch.cartesian_prod(midpoints, midpoints)
+    cell_area = (3 / num_cells) ** 2
+    integral = cell_area * posterior.log_prob(grid).exp().sum()
+    uncorrected = cell_area * posterior.log_prob(grid, norm_posterior=False).exp().sum()
 
     assert uncorrected < 0.7, "The box must truncate the density for this test."
-    assert abs(integral - 1.0) < 0.1
+    assert abs(integral - 1.0) < 0.06
+
+
+def _shifted_uniform_sample(sample_shape, condition):
+    """Draws uniform in a box of half-width 1.5 around each condition, so the mass
+    inside the prior box [0, 3]^2 is known."""
+    noise = 2 * torch.rand(*sample_shape, condition.shape[0], 2) - 1
+    return condition + 1.5 * noise
+
+
+def test_batched_normalizer_equals_one_observation_at_a_time(monkeypatch):
+    """Each observation stops on its own, and gets 0 only for itself."""
+    prior = BoxUniform(torch.zeros(2), 3 * torch.ones(2))
+    posterior = _posterior("direct", prior)
+    monkeypatch.setattr(
+        posterior.posterior_estimator, "sample", _shifted_uniform_sample
+    )
+    x = torch.tensor([[1.5, 1.5], [0.0, 1.5], [0.0, 0.0], [30.0, 30.0]])
+    theta = torch.ones(4, 2)
+    params = {"max_num_draws": 100_000}
+
+    with pytest.warns(UserWarning, match="1 of 4 observation"):
+        batched = posterior.log_prob_batched(
+            theta, x=x, leakage_correction_params=params
+        ).reshape(-1)
+    with pytest.warns(UserWarning, match="1 of 1 observation"):
+        single = torch.cat([
+            posterior.log_prob(
+                theta[i : i + 1], x=x[i : i + 1], leakage_correction_params=params
+            )
+            for i in range(4)
+        ])
+    unnormalized = posterior.log_prob_batched(theta, x=x, norm_posterior=False)
+
+    expected = unnormalized.reshape(-1)[:3] - torch.tensor([1.0, 0.5, 0.25]).log()
+    assert torch.allclose(batched[:3], expected, atol=0.03)
+    assert torch.allclose(single[:3], expected, atol=0.03)
+    assert batched[3].isnan() and single[3].isnan()
+
+
+def test_zero_mass_gives_nan_inside_and_minus_inf_outside():
+    """Without any draw inside the prior, normalizing would divide by 0."""
+    prior = BoxUniform(20 * torch.ones(2), 21 * torch.ones(2))
+    posterior = _posterior("flow", prior).set_default_x(torch.zeros(1, 2))
+    theta = torch.tensor([[20.5, 20.5], [0.0, 0.0]])
+    params = {"num_rejection_samples": 300, "max_num_draws": 300}
+
+    with pytest.warns(UserWarning, match="below about 1.0e-02"):
+        log_prob = posterior.log_prob(theta, leakage_correction_params=params)
+        assert posterior.leakage_correction(posterior.default_x, **params) == 0
+
+    assert log_prob[0].isnan() and log_prob[1] == float("-inf")
+
+
+def test_count_accepted_stops_at_target_or_cap_within_batch_size():
+    """Each observation stops at its target of accepted draws or at the cap, and no
+    call of the proposal draws more than the batch size."""
+    draws_per_call = []
+
+    def proposal(num_draws, indices):
+        draws_per_call.append(num_draws * len(indices))
+        return indices.expand(num_draws, -1)
+
+    accepted, drawn = count_accepted(
+        proposal,
+        lambda theta: theta == 0,
+        num_xos=2,
+        target_accepted=10,
+        max_num_draws=75,
+        max_sampling_batch_size=40,
+    )
+
+    # The first call draws 20% more than the target of 10.
+    assert accepted.tolist() == [12, 0] and drawn.tolist() == [12, 75]
+    assert max(draws_per_call) <= 40
 
 
 @pytest.mark.parametrize("estimator_type", ["flow", "score"])
@@ -104,6 +181,9 @@ def test_leakage_correction_caching(estimator_type, monkeypatch):
     assert estimates({"num_rejection_samples": 50}) > 0, (
         "Another number of samples must not reuse the saved factor."
     )
+    assert estimates({"num_rejection_samples": 50, "max_num_draws": 60}) > 0, (
+        "Another limit of draws must not reuse the saved factor."
+    )
     posterior.log_prob(theta, x=2 * x_b, leakage_correction_params=params)
     posterior.leakage_correction(posterior.default_x, force_update=True, **params)
     assert torch.equal(calls[-1][1], posterior.default_x)
@@ -118,9 +198,14 @@ def test_leakage_cache_matches_nan_padded_x():
     posterior = _posterior("direct", prior)
     calls = []
     x = torch.tensor([[0.0, float("nan")]])
+    ones = torch.ones(1)
     for _ in range(2):
         posterior._cached_leakage_factor(
-            x.clone(), 100, prior, lambda: calls.append(1) or torch.ones(())
+            x.clone(),
+            100,
+            prior,
+            lambda: calls.append(1) or (ones, ones),
+            "",
         )
     assert len(calls) == 1
 

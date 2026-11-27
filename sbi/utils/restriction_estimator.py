@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from copy import deepcopy
 from math import floor
 from typing import Any, Callable, Literal, Optional, Self, Tuple, Union
@@ -819,9 +820,10 @@ class RestrictedPrior(Distribution):
                 consumption.
             prior_acceptance_params: A `dict` of keyword arguments to override the
                 default values of `prior_acceptance()`. Possible options are:
-                `num_rejection_samples`, `force_update`, `show_progress_bars`, and
-                `rejection_sampling_batch_size`. These parameters only have an effect
-                if `norm_restricted_prior=True`.
+                `num_rejection_samples`, `force_update`, `show_progress_bars`,
+                `rejection_sampling_batch_size` and `max_num_draws`. These parameters
+                only have an effect if `norm_restricted_prior=True`. Without any
+                accepted draw, the log probability is NaN inside the restriction.
 
         Returns:
             `(len(θ),)`-shaped log probability for θ in the support of the restricted
@@ -836,15 +838,15 @@ class RestrictedPrior(Distribution):
             accepted = self._accept_reject_fn(theta).bool().reshape(batch_shape)
             masked_log_prob = prior_log_prob.masked_fill(~accepted, float("-inf"))
 
-            if prior_acceptance_params is None:
-                prior_acceptance_params = dict()  # use defaults
-            log_factor = (
-                torch.log(self.prior_acceptance(**prior_acceptance_params))
-                if norm_restricted_prior
-                else 0
+            if not norm_restricted_prior:
+                return masked_log_prob
+            # `sbi.inference` imports `sbi.utils`, so it cannot be imported at the top.
+            from sbi.inference.posteriors.base_posterior import (
+                _normalize_by_support_mass,
             )
 
-            return masked_log_prob - log_factor
+            acceptance = self.prior_acceptance(**(prior_acceptance_params or {}))
+            return _normalize_by_support_mass(masked_log_prob, acceptance)
 
     @torch.no_grad()
     def prior_acceptance(
@@ -853,31 +855,58 @@ class RestrictedPrior(Distribution):
         force_update: bool = False,
         show_progress_bars: bool = False,
         rejection_sampling_batch_size: int = 10_000,
+        max_num_draws: Optional[int] = None,
     ) -> Tensor:
         """
         Return the fraction of prior samples accepted by the classifier.
 
-        The factor is estimated from the acceptance probability during rejection
-        sampling from the prior.
+        It draws from the prior until `num_rejection_samples` draws are accepted or
+        `max_num_draws` draws are made, and warns if it accepted none. The rate is
+        saved and estimated again when these two arguments change.
 
         Args:
-            num_rejection_samples: Number of samples to estimate the acceptance rate.
+            num_rejection_samples: Number of accepted draws after which the estimate
+                stops.
             force_update: Whether to force update the acceptance rate.
             show_progress_bars: Whether to show progress bars during sampling.
             rejection_sampling_batch_size: Batch size for rejection sampling.
+            max_num_draws: Number of draws after which the estimate stops, whatever
+                it accepted. Defaults to the larger of `num_rejection_samples` and
+                1_000_000.
 
         Returns:
             Tensor of the estimated acceptance rate.
         """
-        if self.acceptance_rate is None or force_update:
-            self.sample(
-                sample_shape=torch.Size((num_rejection_samples,)),
-                sample_with="rejection",
-                show_progress_bars=show_progress_bars,
+        if max_num_draws is None:
+            max_num_draws = max(num_rejection_samples, 1_000_000)
+        key = (num_rejection_samples, max_num_draws)
+        # A rate saved by `sample()` has no key and is reused, as before.
+        if (
+            self.acceptance_rate is None
+            or force_update
+            or getattr(self, "_acceptance_key", key) != key
+        ):
+            from sbi.samplers.rejection.rejection import count_accepted
+
+            accepted, drawn = count_accepted(
+                proposal=lambda num_draws, _: self._prior.sample((num_draws,)),
+                accept_reject_fn=self._accept_reject_fn,
+                num_xos=1,
+                target_accepted=num_rejection_samples,
+                max_num_draws=max_num_draws,
                 max_sampling_batch_size=rejection_sampling_batch_size,
-                save_acceptance_rate=True,
+                show_progress_bars=show_progress_bars,
             )
-        # after calling sample, self.acceptance_rate will be a Tensor.
+            if accepted.item() == 0:
+                warnings.warn(
+                    f"The `RestrictedPrior` accepted none of {drawn.item()} prior "
+                    f"draws, so its acceptance is below about {3 / drawn.item():.1e} "
+                    "and `log_prob()` is NaN inside the restriction. Raise "
+                    "`max_num_draws` to resolve a smaller acceptance.",
+                    stacklevel=2,
+                )
+            self.acceptance_rate = (accepted / drawn).reshape(()).to(self._device)
+            self._acceptance_key = key
         return self.acceptance_rate  # type: ignore
 
     @property
