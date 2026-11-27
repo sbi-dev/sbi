@@ -2,7 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import warnings
-from typing import List, Optional, Self, Tuple, Union
+from typing import Any, List, Optional, Self, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -237,16 +237,35 @@ class EnsemblePosterior(NeuralPosterior):
 
         Raises:
             TypeError if weights are provided in an unsupported format.
+            ValueError if weights length does not match the number of components or
+                if weights are negative or sum to zero.
 
         Args:
             weights: Assigns weight to each posterior distribution.
         """
         if weights is None:
-            self._weights = torch.tensor([
-                1.0 / self.num_components for _ in range(self.num_components)
-            ])
+            self._weights = torch.full(
+                (self.num_components,), 1.0 / self.num_components
+            )
         elif isinstance(weights, (Tensor, List)):
-            self._weights = torch.tensor(weights) / sum(weights)
+            weights_tensor = torch.as_tensor(weights)
+            if not weights_tensor.is_floating_point():
+                weights_tensor = weights_tensor.to(dtype=torch.float32)
+            if weights_tensor.ndim != 1:
+                raise ValueError(
+                    f"Weights must be 1D, got {weights_tensor.ndim}D tensor."
+                )
+            if weights_tensor.shape[0] != self.num_components:
+                raise ValueError(
+                    f"Number of weights ({weights_tensor.shape[0]}) does not match "
+                    f"number of posteriors ({self.num_components})."
+                )
+            if (weights_tensor < 0).any() or weights_tensor.sum() <= 0:
+                raise ValueError(
+                    "Weights must be non-negative and sum to a positive value."
+                )
+            normalized = weights_tensor / weights_tensor.sum()
+            self._weights = normalized.to(dtype=torch.float32)
         else:
             raise TypeError
         self._weights = self._weights.to(self.device)
@@ -287,20 +306,24 @@ class EnsemblePosterior(NeuralPosterior):
         x = self._x_else_default_x(x)
         self._check_num_observations(x.shape[0])
         self._check_x(x)
-        num_samples = torch.Size(sample_shape).numel()
-        posterior_indizes = torch.multinomial(
+        sample_shape = torch.Size(sample_shape)
+        num_samples = sample_shape.numel()
+        if num_samples == 0:
+            return self._empty_sample(sample_shape)
+
+        posterior_indices = torch.multinomial(
             self._weights, num_samples, replacement=True
         )
         samples = []
         for posterior_index, sample_size in torch.vstack(
-            posterior_indizes.unique(return_counts=True)
+            posterior_indices.unique(return_counts=True)
         ).T:
             sample_shape_c = torch.Size((int(sample_size),))
             samples.append(
                 self.posteriors[posterior_index].sample(sample_shape_c, x=x, **kwargs)
             )
         samples = self._stack_and_shuffle(samples, num_samples)
-        return samples.reshape(*sample_shape, -1)
+        return samples.reshape(sample_shape + samples.shape[1:])
 
     def sample_batched(
         self,
@@ -310,7 +333,11 @@ class EnsemblePosterior(NeuralPosterior):
     ) -> Tensor:
         # Guard here so validation of `x` does not depend on the component draw.
         x = self._process_x(x)
-        num_samples = torch.Size(sample_shape).numel()
+        sample_shape = torch.Size(sample_shape)
+        num_samples = sample_shape.numel()
+        if num_samples == 0:
+            return self._empty_sample_batched(sample_shape, x.shape[0])
+
         posterior_indices = torch.multinomial(
             self._weights, num_samples, replacement=True
         )
@@ -326,6 +353,99 @@ class EnsemblePosterior(NeuralPosterior):
             )
         samples = self._stack_and_shuffle(samples, num_samples)
         return samples.reshape(sample_shape + samples.shape[1:])
+
+    def _fallback_event_shape_and_dtype(self) -> Tuple[torch.Size, torch.dtype]:
+        """Derive the parameter event shape and dtype from prior or components
+        without invoking samplers or drawing samples.
+        """
+
+        def _extract_shape_and_dtype_from_dist(
+            dist: Any,
+        ) -> Optional[Tuple[torch.Size, torch.dtype]]:
+            while dist is not None:
+                batch_shape = getattr(dist, "batch_shape", torch.Size())
+                event_shape = getattr(dist, "event_shape", torch.Size())
+                combined_shape = torch.Size(batch_shape + event_shape)
+                if len(combined_shape) > 0:
+                    dtype = getattr(dist, "dtype", None)
+                    if dtype is None:
+                        for attr in ("loc", "mean", "logits", "probs", "scale"):
+                            val = getattr(dist, attr, None)
+                            if isinstance(val, Tensor):
+                                dtype = val.dtype
+                                break
+                    if dtype is None:
+                        dtype = torch.float32
+                    return combined_shape, dtype
+                dist = getattr(dist, "_prior", None) or getattr(
+                    dist, "full_prior", None
+                )
+            return None
+
+        if self.prior is not None:
+            res = _extract_shape_and_dtype_from_dist(self.prior)
+            if res is not None:
+                return res
+
+        # When the ensemble has no prior, derive event shape from the components.
+        for component in self.posteriors:
+            for dist_attr in ("prior", "_prior", "proposal"):
+                dist = getattr(component, dist_attr, None)
+                res = _extract_shape_and_dtype_from_dist(dist)
+                if res is not None:
+                    return res
+
+            for attr in ("event_shape", "theta_shape"):
+                shape = getattr(component, attr, None)
+                if shape is not None and len(shape) > 0:
+                    dtype = getattr(component, "dtype", torch.float32)
+                    return torch.Size(shape), dtype
+
+            param_dim = getattr(component, "parameter_dim", None)
+            if isinstance(param_dim, int):
+                dtype = getattr(component, "dtype", torch.float32)
+                return torch.Size([param_dim]), dtype
+
+            estimator = getattr(component, "posterior_estimator", None)
+            if estimator is not None:
+                shape = getattr(estimator, "input_shape", None)
+                if callable(shape):
+                    shape = shape()
+                if shape is not None and len(shape) > 0:
+                    try:
+                        dtype = next(estimator.parameters()).dtype
+                    except (StopIteration, AttributeError):
+                        dtype = torch.float32
+                    return torch.Size(shape), dtype
+
+            potential = getattr(component, "potential_fn", None)
+            if potential is not None:
+                for dist_attr in ("prior", "proposal"):
+                    dist = getattr(potential, dist_attr, None)
+                    res = _extract_shape_and_dtype_from_dist(dist)
+                    if res is not None:
+                        return res
+                for attr in ("theta_shape", "event_shape", "input_shape"):
+                    shape = getattr(potential, attr, None)
+                    if shape is not None and len(shape) > 0:
+                        dtype = getattr(potential, "dtype", torch.float32)
+                        return torch.Size(shape), dtype
+
+        return torch.Size([1]), torch.float32
+
+    def _empty_sample(self, sample_shape: torch.Size) -> Tensor:
+        """Return an empty sample tensor of shape `sample_shape + event_shape`."""
+        event_shape, dtype = self._fallback_event_shape_and_dtype()
+        empty = torch.empty((0, *event_shape), dtype=dtype, device=self.device)
+        return empty.reshape(sample_shape + event_shape)
+
+    def _empty_sample_batched(self, sample_shape: torch.Size, num_obs: int) -> Tensor:
+        """Return an empty sample tensor of shape
+        `sample_shape + (num_obs, *event_shape)`.
+        """
+        event_shape, dtype = self._fallback_event_shape_and_dtype()
+        empty = torch.empty((0, num_obs, *event_shape), dtype=dtype, device=self.device)
+        return empty.reshape(sample_shape + (num_obs, *event_shape))
 
     @staticmethod
     def _stack_and_shuffle(samples: List[Tensor], num_samples: int) -> Tensor:
