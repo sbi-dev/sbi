@@ -10,6 +10,22 @@ import torch
 from torch import Tensor, nn
 from torch._higher_order_ops.associative_scan import associative_scan  # type: ignore
 
+# torch before 2.8 runs the scan through `torch.compile`, which turns off argument
+# validation for all `torch.distributions` globally, and fails on Python 3.13 with
+# torch 2.5.
+_SCAN_MIN_TORCH = (2, 8)
+_SCAN_SUPPORTED = torch.__version__ >= _SCAN_MIN_TORCH
+
+
+def _check_scan_supported() -> None:
+    """Raise if the installed torch cannot run the LRU's associative scan."""
+    if not _SCAN_SUPPORTED:
+        min_version = ".".join(map(str, _SCAN_MIN_TORCH))
+        raise ValueError(
+            f"mode='scan' needs torch {min_version} or newer, found torch "
+            f"{torch.__version__}. Use mode='loop', which computes the same result."
+        )
+
 
 def _aggregate_last_step(x: Tensor) -> Tensor:
     """Aggregate a sequence of hidden states by keeping the last one."""
@@ -75,9 +91,9 @@ class LRUEmbedding(nn.Module):
                 (internal) state dimension.
             mode: Whether to run the LRU's forward passes in a for-loop `mode="loop"`
                 or using an associative scan `mode="scan"`. The former one is the naive
-                implementation while the latter one relies on very recent features of
-                PyTorch. Note that at the point of writing this, PyTorch's associative
-                scan function does no support a backward pass.
+                implementation while the latter one needs torch 2.8 or newer. Note that
+                at the point of writing this, PyTorch's associative scan function does
+                not support a backward pass.
             dropout: Dropout rate applied to the hidden states of the LRU blocks.
                 There are two dropout layers in each LRU block, one after the LRU and
                 one after the state mixing.
@@ -253,6 +269,7 @@ class LRU(nn.Module):
         if mode not in ("loop", "scan"):
             raise ValueError(f"Invalid {mode=}. Must be 'loop' or 'scan'.")
         if mode == "scan":
+            _check_scan_supported()
             warnings.warn(
                 "The scan mode currently does not support a backward pass, "
                 "the code will be updated once this is pytorch native",
@@ -316,7 +333,7 @@ class LRU(nn.Module):
                 to a complex zero tensor of the expected shape.
             mode: Whether to run the forward pass in a for-loop `"loop"` or using an
                 associative scan `"scan"`. The former one is the naive implementation
-                while the latter one relies on very recent features of PyTorch. If
+                while the latter one needs torch 2.8 or newer. If
                 set to `None` (default) the forward pass will use the mode given at
                 initialization.
 
@@ -422,6 +439,7 @@ class LRU(nn.Module):
             Transformed sequential data of shape (batch_size, sequence_length,
                 input_dim)
         """
+        _check_scan_supported()
         # Normalize the input-facing matrix.
         B_norm = self.B * self.gamma.unsqueeze(dim=-1)
 

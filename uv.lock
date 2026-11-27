@@ -4608,7 +4608,7 @@ requires-dist = [
     { name = "sphinx-math-dollar", marker = "extra == 'doc'" },
     { name = "tabpfn", marker = "extra == 'tabpfn'" },
     { name = "tensorboard" },
-    { name = "torch", specifier = ">=1.13.0" },
+    { name = "torch", specifier = ">=2.5.0" },
     { name = "torchtestcase", marker = "extra == 'dev'" },
     { name = "tqdm" },
     { name = "zuko", specifier = ">=1.2.0" },

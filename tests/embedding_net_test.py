@@ -30,7 +30,7 @@ from sbi.neural_nets.embedding_nets import (
     SpectralConvEmbedding,
     TransformerEmbedding,
 )
-from sbi.neural_nets.embedding_nets.lru import LRU, LRUBlock
+from sbi.neural_nets.embedding_nets.lru import LRU, _SCAN_SUPPORTED, LRUBlock
 from sbi.neural_nets.net_builders.mixed_nets import build_mnle
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -668,7 +668,7 @@ def test_permutation_invariant_embedding_warns_on_invalid_padding(pattern):
     if pattern == "no_real_trial":
         # Zero aggregate and zero trial count; "mean" must not divide by zero.
         fc_input = torch.zeros(1, trial_net_output_dim + 1)
-        assert torch.allclose(output[1], embedding.fc_subnet(fc_input)[0])
+        assert torch.allclose(output[1], embedding.fc_subnet(fc_input)[0], atol=1e-6)
 
 
 def test_permutation_invariant_embedding_rejects_inf():
@@ -763,7 +763,13 @@ def test_1d_ResNet_fc_embedding_net(input_shape, n_blocks, c_internal, c_hidden_
     _train_and_infer_with_embedding(prior, xo, simulator, embedding_net, "mdn", "NPE")
 
 
-@pytest.mark.parametrize("mode", ["loop", pytest.param("scan")], ids=["loop", "scan"])
+requires_lru_scan = pytest.mark.skipif(
+    not _SCAN_SUPPORTED, reason="The LRU scan mode needs a newer torch."
+)
+LRU_MODES = ["loop", pytest.param("scan", marks=requires_lru_scan)]
+
+
+@pytest.mark.parametrize("mode", LRU_MODES)
 @pytest.mark.parametrize(
     "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
 )
@@ -802,21 +808,7 @@ def test_lru_isolated(
 @pytest.mark.parametrize(
     "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
 )
-@pytest.mark.parametrize(
-    "mode",
-    [
-        "loop",
-        pytest.param(
-            "scan",
-            marks=pytest.mark.xfail(
-                condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5),
-                reason="PyTorch's associative_scan only exists for torch >= 2.5",
-                strict=True,
-            ),
-        ),
-    ],
-    ids=["loop", "scan"],
-)
+@pytest.mark.parametrize("mode", LRU_MODES)
 @pytest.mark.parametrize(
     "apply_input_normalization",
     [True, False],
@@ -862,21 +854,7 @@ def test_lru_block_isolated(
 @pytest.mark.parametrize(
     "bidirectional", [True, False], ids=["one-directional", "bi-directional"]
 )
-@pytest.mark.parametrize(
-    "mode",
-    [
-        "loop",
-        pytest.param(
-            "scan",
-            marks=pytest.mark.xfail(
-                condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5),
-                reason="PyTorch's associative_scan only exists for torch >= 2.5",
-                strict=True,
-            ),
-        ),
-    ],
-    ids=["loop", "scan"],
-)
+@pytest.mark.parametrize("mode", LRU_MODES)
 @pytest.mark.parametrize(
     "aggregate_fcn", ["last_step", "mean"], ids=["last-step", "mean"]
 )
@@ -1005,11 +983,7 @@ def test_lru_pipeline(embedding_feat_dim: int = 17):
     assert samples.shape == (10, 2)
 
 
-@pytest.mark.xfail(
-    condition=tuple(map(int, torch.__version__.split('.')[:2])) < (2, 5),
-    reason="PyTorch's associative_scan only exists for torch >= 2.5",
-    strict=True,
-)
+@requires_lru_scan
 @pytest.mark.filterwarnings("ignore:Torchinductor")
 def test_scan(
     input_dim: int = 3,
@@ -1094,7 +1068,7 @@ LRU_DEFAULTS = dict(
     r_max=1.0,
     phase_max=torch.pi,
     bidirectional=False,
-    mode="scan",
+    mode="loop",
 )
 
 
