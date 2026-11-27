@@ -426,7 +426,7 @@ class ActiveSubspace:
             predictions = self._regression_net.forward(thetas)
         loss = predictions.mean()
         loss.backward()
-        gradients = torch.squeeze(thetas.grad)
+        gradients = thetas.grad.reshape(thetas.shape[0], -1)
         if norm_gradients_to_prior:
             if hasattr(self._posterior.prior, "stddev") and hasattr(
                 self._posterior.prior, "mean"

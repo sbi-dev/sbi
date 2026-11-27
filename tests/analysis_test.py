@@ -66,6 +66,37 @@ def test_analysis_modules(device: str) -> None:
     )
 
 
+def test_active_subspace_with_single_parameter() -> None:
+    """`find_directions` must keep the parameter axis for a 1-D parameter.
+
+    `torch.squeeze` without a dimension dropped the single parameter axis, so the
+    outer product of the gradients raised a RuntimeError for one-parameter models.
+    """
+    torch.manual_seed(0)
+    num_dim = 1
+    prior = BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
+
+    def simulator(theta):
+        return theta + 0.1 * torch.randn_like(theta)
+
+    theta = prior.sample((200,))
+    inference = NPE(prior=prior)
+    inference.append_simulations(theta, simulator(theta)).train(max_num_epochs=2)
+    posterior = inference.build_posterior().set_default_x(torch.zeros(num_dim))
+
+    active_subspace = ActiveSubspace(posterior)
+    eigen_values, eigen_vectors = active_subspace.find_directions(
+        posterior_log_prob_as_property=True, num_monte_carlo_samples=50
+    )
+
+    assert eigen_values.shape == (num_dim,)
+    assert eigen_vectors.shape == (num_dim, num_dim)
+    assert torch.isfinite(eigen_values).all()
+    # The single eigenvector is a unit vector along the only axis.
+    assert torch.isclose(eigen_vectors.abs().sum(), torch.tensor(1.0))
+    assert active_subspace.project(theta[:10], 1).shape == (10, num_dim)
+
+
 @pytest.mark.parametrize("num_candidates", (1_000,))
 def test_1d_marginals_peaks_from_kde(num_candidates):
     num_samples = 10_000
