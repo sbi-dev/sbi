@@ -605,7 +605,7 @@ def test_api_snpe_c_posterior_correction(
     samples = posterior.sample((10,))
 
     # Evaluate the samples to check correction factor.
-    _ = posterior.log_prob(samples)
+    _ = posterior.potential(samples)
 
 
 # Testing rejection and mcmc sampling methods.

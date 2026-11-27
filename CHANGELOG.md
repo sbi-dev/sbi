@@ -17,6 +17,7 @@
   * `verbosity` of `get_statistics_under_null_hypothesis()` can only be passed by keyword now.
 * **Posteriors no longer take `x_shape`** ([#XXXX](https://github.com/sbi-dev/sbi/pull/XXXX)): it had no effect and warned since v0.23.0. Remove it from the call.
   * In `DirectPosterior`, `FilteredDirectPosterior`, `MCMCPosterior` and `VIPosterior`, the arguments that followed it (`enable_transform`, `filter_type`, `filter_size`, `target_accept`, `parameters` and the later `VIPosterior` arguments) can only be passed by keyword now.
+* **`MCMCPosterior.log_prob()` and `RejectionPosterior.log_prob()` raise a `NotImplementedError`** ([#XXXX](https://github.com/sbi-dev/sbi/pull/XXXX)): these posteriors can only evaluate the log-probability up to a normalizing constant, and `log_prob()` warned since v0.18.0 that it was deprecated for them. Use `.potential(theta, x)`, which returns the same values. This also applies to an `EnsemblePosterior` of such posteriors.
 
 ## v0.27.0
 

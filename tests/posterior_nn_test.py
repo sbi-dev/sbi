@@ -1010,17 +1010,15 @@ def test_ensemble_evaluates_its_posteriors_at_its_default_x(npe_for_iid_x):
     components = [trainer.build_posterior(sample_with="rejection") for _ in range(2)]
     posterior = EnsemblePosterior(components).set_default_x(zeros(1, 2))
     theta = torch.tensor([[0.0, 0.0], [0.5, -0.5]])
-    expected = posterior.log_prob(theta)
+    expected = posterior.potential(theta)
 
     components[0].set_default_x(ones(1, 2))
-    assert torch.allclose(posterior.log_prob(theta), expected)
+    assert torch.allclose(posterior.potential(theta), expected)
 
 
-@pytest.mark.parametrize(
-    "sample_with, method", [("importance", "potential"), ("rejection", "log_prob")]
-)
+@pytest.mark.parametrize("sample_with", ["importance", "rejection"])
 def test_posteriors_combine_several_observations_as_iid_trials(
-    sample_with, method, npe_for_iid_x
+    sample_with, npe_for_iid_x
 ):
     """Each theta is evaluated given all observations as iid trials, also with as many
     theta as observations, where main paired them. NPE posteriors warn."""
@@ -1034,7 +1032,7 @@ def test_posteriors_combine_several_observations_as_iid_trials(
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        value = getattr(posterior, method)(theta, x=x_o)
+        value = posterior.potential(theta, x=x_o)
     iid_warnings = [w for w in caught if "x holds 3 observations" in str(w.message)]
     assert len(iid_warnings) == 1
     assert torch.allclose(value, expected, atol=1e-4)
