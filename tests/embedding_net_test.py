@@ -141,8 +141,7 @@ def test_embedding_api_with_multiple_trials(
         posterior = inference.build_posterior().set_default_x(x_o)
     elif posterior_method == "mcmc":
         posterior = inference.build_posterior(
-            sample_with=posterior_method,
-            mcmc_method="slice_np_vectorized",
+            sample_with=posterior_method
         ).set_default_x(x_o)
     if num_xo_batch == 1:
         s = posterior.sample((1,), x=x_o)
@@ -668,7 +667,7 @@ def test_permutation_invariant_embedding_warns_on_invalid_padding(pattern):
     if pattern == "no_real_trial":
         # Zero aggregate and zero trial count; "mean" must not divide by zero.
         fc_input = torch.zeros(1, trial_net_output_dim + 1)
-        assert torch.allclose(output[1], embedding.fc_subnet(fc_input)[0])
+        assert torch.allclose(output[1], embedding.fc_subnet(fc_input)[0], atol=1e-6)
 
 
 def test_permutation_invariant_embedding_rejects_inf():

@@ -1464,3 +1464,32 @@ def seed_all_backends(seed: Optional[Union[int, Tensor]] = None) -> None:
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True  # type: ignore
     torch.backends.cudnn.benchmark = False  # type: ignore
+
+
+def log_prob_or_potential(
+    density: Any, theta: Tensor, track_gradients: bool = False
+) -> Tensor:
+    """Returns the log-density of `theta`, up to a constant for some posteriors.
+
+    MCMC and rejection posteriors only evaluate the log-probability up to a
+    normalizing constant, their `potential()`, and their `log_prob()` is deprecated.
+    Callers that cancel a constant, such as rejection and importance sampling with a
+    proposal or a density plot scaled to its maximum, use the potential instead. A
+    subclass that overrides `log_prob()` keeps it.
+
+    Args:
+        density: Object with a `log_prob()`, or an MCMC or rejection posterior.
+        theta: Parameters to evaluate.
+        track_gradients: Whether the potential of an MCMC or rejection posterior
+            supports gradients. Other densities use their own `log_prob()`.
+
+    Returns:
+        Log-density of `theta`, up to a constant for MCMC and rejection posteriors.
+    """
+    from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
+    from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
+
+    deprecated = (MCMCPosterior.log_prob, RejectionPosterior.log_prob)
+    if getattr(type(density), "log_prob", None) in deprecated:
+        return density.potential(theta, track_gradients=track_gradients)
+    return density.log_prob(theta)

@@ -129,7 +129,7 @@ class VIPosterior(NeuralPosterior):
         theta_transform: Optional[TorchTransform] = None,
         vi_method: Literal["rKL", "fKL", "IW", "alpha"] = "rKL",
         device: Union[str, torch.device] = "cpu",
-        x_shape: Optional[torch.Size] = None,
+        *,
         parameters: Optional[Iterable] = None,
         modules: Optional[Iterable] = None,
         num_transforms: int = 5,
@@ -175,7 +175,6 @@ class VIPosterior(NeuralPosterior):
                 Amortized training (train_amortized) supports only `rKL`.
             device: Training device, e.g., `cpu`, `cuda` or `cuda:0`. We will ensure
                 that all other objects are also on this device.
-            x_shape: Deprecated, should not be passed.
             parameters: List of parameters of the variational posterior. This is only
                 required for user-defined q i.e. if q does not have a `parameters`
                 attribute.
@@ -195,12 +194,11 @@ class VIPosterior(NeuralPosterior):
                 "none", "independent", "structured". Only used for amortized VI
                 (train_amortized). Use "structured" for structured data like images.
         """
-        super().__init__(potential_fn, theta_transform, device, x_shape=x_shape)
+        super().__init__(potential_fn, theta_transform, device)
 
         # Especially the prior may be on another device -> move it...
         device = self._device
         self.theta_transform = theta_transform
-        self.x_shape = x_shape
         self.potential_fn.device = device
         self.potential_fn.to(device)
 

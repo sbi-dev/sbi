@@ -10,6 +10,7 @@ from torch import Tensor
 
 from sbi.sbi_types import Proposal
 from sbi.utils.pbar import nested_pbar_context
+from sbi.utils.sbiutils import log_prob_or_potential
 
 
 def importance_sample(
@@ -38,7 +39,7 @@ def importance_sample(
     # One value per sample: a 1-D distribution without `Independent` returns
     # (N, 1), which would broadcast against (N,) to an (N, N) tensor.
     potential_logprobs = potential_fn(samples).reshape(num_samples)
-    proposal_logprobs = proposal.log_prob(samples).reshape(num_samples)
+    proposal_logprobs = log_prob_or_potential(proposal, samples).reshape(num_samples)
     log_importance_weights = potential_logprobs - proposal_logprobs
 
     return samples, log_importance_weights

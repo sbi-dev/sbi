@@ -4,7 +4,6 @@
 from typing import Literal, Optional, Union
 
 from torch.distributions import Distribution
-from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.trainers.nle.nle_base import LikelihoodEstimatorTrainer
 from sbi.neural_nets.estimators.base import (
@@ -66,8 +65,9 @@ class NLE_A(LikelihoodEstimatorTrainer):
             None,
         ] = None,
         device: str = "cpu",
-        logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[SummaryWriter] = None,
+        logging_level: Optional[Union[int, str]] = None,
+        *,
+        summary_writer: None = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
@@ -84,10 +84,10 @@ class NLE_A(LikelihoodEstimatorTrainer):
                 that builds a custom neural network can be provided. If None, it
                 uses `MAFConfig()`.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
-            logging_level: Minimum severity of messages to log. One of the strings
-                INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: Deprecated alias for the TensorBoard summary writer.
-                Use ``tracker`` instead.
+            logging_level: Deprecated, it has no effect and goes in sbi v0.29.0.
+                Use `logging.getLogger("sbi").setLevel(...)` instead.
+            summary_writer: Removed in sbi v0.28.0; passing it raises a `TypeError`.
+                Use `tracker=TensorBoardTracker(summary_writer)` instead.
             tracker: Tracking adapter used to log training metrics. If None, a
                 TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show a progressbar during simulation and

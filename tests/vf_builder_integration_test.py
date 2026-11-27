@@ -211,36 +211,6 @@ def test_string_path_warns_and_names_the_import(trainer_cls, gaussian_sims):
 
 
 @pytest.mark.parametrize(
-    "trainer_cls, kwarg",
-    [
-        (FMPE, "density_estimator"),
-        (NPSE, "score_estimator"),
-        (NPSE, "density_estimator"),
-    ],
-)
-def test_legacy_kwarg_warns(trainer_cls, kwarg, gaussian_sims):
-    prior, _, _ = gaussian_sims
-    with pytest.warns(FutureWarning, match="deprecated"):
-        trainer_cls(prior, **{kwarg: "mlp"}, show_progress_bars=False)
-
-
-@pytest.mark.parametrize(
-    "trainer_cls, kwarg",
-    [
-        (FMPE, "density_estimator"),
-        (NPSE, "score_estimator"),
-        (NPSE, "density_estimator"),
-    ],
-)
-def test_legacy_and_vf_estimator_conflict(trainer_cls, kwarg, gaussian_sims):
-    prior, _, _ = gaussian_sims
-    with pytest.raises(ValueError, match="Cannot pass both"):
-        trainer_cls(
-            prior, vf_estimator="mlp", **{kwarg: "mlp"}, show_progress_bars=False
-        )
-
-
-@pytest.mark.parametrize(
     "factory_fn", [posterior_flow_nn, posterior_score_nn], ids=["flow", "score"]
 )
 def test_advertised_time_emb_types_all_build(factory_fn):

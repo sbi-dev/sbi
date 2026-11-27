@@ -22,7 +22,6 @@ import torch
 from torch import Tensor, ones
 from torch.distributions import Distribution
 from torch.utils import data
-from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference import MaskedNeuralInference, NeuralInference
@@ -278,8 +277,9 @@ class VectorFieldTrainer(
             None,
         ] = None,
         device: str = "cpu",
-        logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[SummaryWriter] = None,
+        logging_level: Optional[Union[int, str]] = None,
+        *,
+        summary_writer: None = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
@@ -301,8 +301,8 @@ class VectorFieldTrainer(
                 transformer_cross_attn). Alternatively, a function that
                 builds a custom neural network can be provided.
             device: Device to run the training on.
-            logging_level: Logging level for the training. Can be an integer or a
-                string.
+            logging_level: Deprecated, it has no effect and goes in sbi v0.29.0.
+                Use `logging.getLogger("sbi").setLevel(...)` instead.
             tracker: Tracking adapter used to log training metrics. If None, a
                 TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show progress bars during training.
@@ -793,8 +793,9 @@ class MaskedVectorFieldTrainer(
         posterior_observed_idx: Optional[list | Tensor] = None,
         prior: Optional[Distribution] = None,
         device: str = "cpu",
-        logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[SummaryWriter] = None,
+        logging_level: Optional[Union[int, str]] = None,
+        *,
+        summary_writer: None = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
@@ -817,10 +818,10 @@ class MaskedVectorFieldTrainer(
                 the default prior of `build_posterior` (rejection of samples outside
                 its support, iid sampling). Training does not use it.
             device: Device to run the training on.
-            logging_level: Logging level for the training. Can be an integer or a
-                string.
-            summary_writer: Deprecated alias for the TensorBoard summary writer.
-                Use ``tracker`` instead.
+            logging_level: Deprecated, it has no effect and goes in sbi v0.29.0.
+                Use `logging.getLogger("sbi").setLevel(...)` instead.
+            summary_writer: Removed in sbi v0.28.0; passing it raises a `TypeError`.
+                Use `tracker=TensorBoardTracker(summary_writer)` instead.
             tracker: Tracking adapter used to log training metrics. If None, a
                 TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show progress bars during training.

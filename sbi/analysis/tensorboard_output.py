@@ -4,7 +4,6 @@
 
 import inspect
 import logging
-import warnings
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
@@ -24,7 +23,7 @@ from sbi.utils.io import get_log_root
 
 
 def plot_summary(
-    trainer: Union[NeuralInference, Path, None] = None,
+    trainer: Union[NeuralInference, Path],
     tags: Optional[List[str]] = None,
     *,
     overlay: bool = False,
@@ -39,8 +38,6 @@ def plot_summary(
     plot_kwargs: Optional[Dict[str, Any]] = None,
     verbose: bool = True,
     tensorboard_scalar_limit: int = 10_000,
-    inference: Union[NeuralInference, Path, None] = None,
-    disable_tensorboard_prompt: Optional[bool] = None,
 ) -> Tuple[Figure, Axes]:
     """Plot scalar data logged by the TensorBoard tracker of a trainer.
 
@@ -67,10 +64,6 @@ def plot_summary(
         verbose: if True (default), log the tensorboard launch hint and the
             list of valid tags.
         tensorboard_scalar_limit: max number of scalars loaded per tag.
-        inference: deprecated alias for ``trainer``. Will be removed in a
-            future release.
-        disable_tensorboard_prompt: deprecated, use ``verbose`` instead
-            (note the polarity flip). Will be removed in a future release.
 
     Returns:
         ``(fig, axes)`` for further composition (e.g. ``axes[0].set_title(...)``,
@@ -102,29 +95,6 @@ def plot_summary(
             axes[0].grid(True)
     """
     logger = logging.getLogger(__name__)
-
-    if inference is not None:
-        if trainer is not None:
-            raise TypeError(
-                "Pass either `trainer` or `inference` (deprecated), not both."
-            )
-        warnings.warn(
-            "`inference` is deprecated and will be removed in a future release; "
-            "use `trainer` instead.",
-            FutureWarning,
-            stacklevel=2,
-        )
-        trainer = inference
-    if trainer is None:
-        raise TypeError("plot_summary() missing required argument: 'trainer'")
-    if disable_tensorboard_prompt is not None:
-        warnings.warn(
-            "`disable_tensorboard_prompt` is deprecated and will be removed in a "
-            "future release; use `verbose` instead (note the polarity flip).",
-            FutureWarning,
-            stacklevel=2,
-        )
-        verbose = not disable_tensorboard_prompt
 
     if tags is None:
         tags = ["validation_loss"]

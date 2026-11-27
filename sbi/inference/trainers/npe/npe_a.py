@@ -9,7 +9,6 @@ from typing import Any, Callable, Dict, Literal, Optional, Union
 
 from torch import Tensor
 from torch.distributions import Distribution, MultivariateNormal
-from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors.npe_a_posterior import NPE_A_Posterior
 from sbi.inference.trainers.npe.npe_base import (
@@ -103,8 +102,9 @@ class NPE_A(PosteriorEstimatorTrainer):
         ] = None,
         num_components: int = 10,
         device: str = "cpu",
-        logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[SummaryWriter] = None,
+        logging_level: Optional[Union[int, str]] = None,
+        *,
+        summary_writer: None = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
@@ -130,10 +130,10 @@ class NPE_A(PosteriorEstimatorTrainer):
             num_components: Number of mixture components in the final round. All
                 other rounds train a single Gaussian.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
-            logging_level: Minimum severity of messages to log. One of the strings
-                INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: Deprecated alias for the TensorBoard summary writer.
-                Use ``tracker`` instead.
+            logging_level: Deprecated, it has no effect and goes in sbi v0.29.0.
+                Use `logging.getLogger("sbi").setLevel(...)` instead.
+            summary_writer: Removed in sbi v0.28.0; passing it raises a `TypeError`.
+                Use `tracker=TensorBoardTracker(summary_writer)` instead.
             tracker: Tracking adapter used to log training metrics. If None, a
                 TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show a progressbar during training.

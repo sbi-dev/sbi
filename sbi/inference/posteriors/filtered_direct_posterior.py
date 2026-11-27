@@ -42,7 +42,7 @@ class FilteredDirectPosterior(DirectPosterior):
         full_context_condition: Tensor,
         max_sampling_batch_size: int = 10_000,
         device: Optional[Union[str, torch.device]] = None,
-        x_shape: Optional[torch.Size] = None,
+        *,
         enable_transform: bool = True,
         filter_type: FilterType = "knn",
         filter_size: int = 2048,
@@ -56,7 +56,6 @@ class FilteredDirectPosterior(DirectPosterior):
             full_context_condition: Full set of context conditions (typically `x`).
             max_sampling_batch_size: Maximum number of samples drawn per internal batch.
             device: Device on which posterior computations are performed.
-            x_shape: Optional event shape for observations.
             enable_transform: Whether to use unconstrained-space transforms for MAP.
             filter_type: Context filtering strategy. Either `"knn"`, `"first"`,
                 or a callable returning selected indices. A callable must return the
@@ -72,7 +71,6 @@ class FilteredDirectPosterior(DirectPosterior):
             prior=prior,
             max_sampling_batch_size=max_sampling_batch_size,
             device=device,
-            x_shape=x_shape,
             enable_transform=enable_transform,
         )
 

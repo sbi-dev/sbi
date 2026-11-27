@@ -1895,9 +1895,7 @@ class VectorFieldConfigBase(_PerModelConfigBase):
         check_data_device(batch_input, batch_condition)
 
         if isinstance(self.net, VectorFieldNetConfigBase):
-            embedded_condition = self.embedding_net.to(batch_condition.device)(
-                batch_condition[:1]
-            )
+            embedded_condition = _probe_module(self.embedding_net, batch_condition[:1])
             vectorfield_net = self.net.build(batch_input, embedded_condition)
         else:
             vectorfield_net = self.net
@@ -1931,7 +1929,6 @@ class VectorFieldConfigBase(_PerModelConfigBase):
             batch_condition, self.z_score_condition, self.embedding_net
         )
 
-        self._warn_unknown_extra_kwargs(self._ESTIMATOR_CLS.__init__)
         return self._ESTIMATOR_CLS(
             net=vectorfield_net,
             input_shape=batch_input[0].shape,
@@ -2196,7 +2193,6 @@ class SimformerConfigBase(_PerModelConfigBase):
             if z_score_bool
             else (0.0, 1.0)
         )
-        self._warn_unknown_extra_kwargs(self._ESTIMATOR_CLS.__init__)
         return self._ESTIMATOR_CLS(
             net=vectorfield_net,  # type: ignore[arg-type]
             input_shape=batch_inputs[0].shape,

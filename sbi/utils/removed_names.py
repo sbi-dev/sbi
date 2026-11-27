@@ -42,6 +42,9 @@ REMOVED_NAMES = {
     "posterior_nn": "from sbi.neural_nets import posterior_nn",
     "likelihood_nn": "from sbi.neural_nets import likelihood_nn",
     "classifier_nn": "from sbi.neural_nets import classifier_nn",
+    "mixed_likelihood_estimator_based_potential": (
+        "from sbi.inference import likelihood_estimator_based_potential"
+    ),
     **{
         old: f"from sbi.neural_nets import {new}; {new}().build(theta, x)"
         for old, new in (

@@ -109,6 +109,7 @@ def test_removed_names_name_their_replacement(name, replacement):
     "package",
     (
         "sbi.utils",
+        "sbi.inference.potentials",
         "sbi.inference.trainers.npe",
         "sbi.inference.trainers.nle",
         "sbi.inference.trainers.nre",

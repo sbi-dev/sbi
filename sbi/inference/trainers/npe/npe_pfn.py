@@ -7,7 +7,6 @@ from typing import Any, Dict, Literal, Optional, Self, Sequence, Tuple, Union
 
 from torch import Tensor, ones
 from torch.distributions import Distribution
-from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
@@ -42,6 +41,14 @@ from sbi.utils import (
 )
 from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
 
+_Sampler = Literal["direct", "filtered_direct", "rejection", "importance"]
+_SAMPLE_WITH: Dict[type, _Sampler] = {
+    DirectPosteriorParameters: "direct",
+    FilteredDirectPosteriorParameters: "filtered_direct",
+    RejectionPosteriorParameters: "rejection",
+    ImportanceSamplingPosteriorParameters: "importance",
+}
+
 
 class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
     r"""Neural Posterior Estimation with TabPFN (NPE-PFN).
@@ -60,8 +67,9 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
             Union[TabPFNConfig, ConditionalEstimatorBuildFn[TabPFNFlow]]
         ] = None,
         device: str = "cpu",
-        logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[SummaryWriter] = None,
+        logging_level: Optional[Union[int, str]] = None,
+        *,
+        summary_writer: None = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
@@ -75,10 +83,10 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
                 Alternatively, a function that builds such an estimator needs to
                 be provided.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
-            logging_level: Minimum severity of messages to log. One of the strings
-                INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: Deprecated alias for the TensorBoard summary writer.
-                Use ``tracker`` instead.
+            logging_level: Deprecated, it has no effect and goes in sbi v0.29.0.
+                Use `logging.getLogger("sbi").setLevel(...)` instead.
+            summary_writer: Removed in sbi v0.28.0; passing it raises a `TypeError`.
+                Use `tracker=TensorBoardTracker(summary_writer)` instead.
             tracker: Tracking adapter used to log training metrics. If None, a
                 TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show a progressbar during training.
@@ -285,6 +293,10 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
                 f"Expected estimator to be TabPFNFlow, got {type(estimator).__name__}."
             )
 
+        # Like the other trainers, a typed `posterior_parameters` selects the sampler.
+        if posterior_parameters is not None:
+            sample_with = _SAMPLE_WITH.get(type(posterior_parameters), sample_with)
+
         if sample_with == "filtered_direct":
             full_context_input, full_context_condition = full_theta, full_x
 
@@ -295,6 +307,9 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
                 sample_with,
                 posterior_parameters,
                 filtered_direct_sampling_parameters=filtered_direct_sampling_parameters,
+                direct_sampling_parameters=direct_sampling_parameters,
+                rejection_sampling_parameters=rejection_sampling_parameters,
+                importance_sampling_parameters=importance_sampling_parameters,
             )
 
             self._posterior = FilteredDirectPosterior(
@@ -314,6 +329,7 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
             prior,
             sample_with,
             posterior_parameters,
+            filtered_direct_sampling_parameters=filtered_direct_sampling_parameters,
             direct_sampling_parameters=direct_sampling_parameters,
             rejection_sampling_parameters=rejection_sampling_parameters,
             importance_sampling_parameters=importance_sampling_parameters,

@@ -1791,7 +1791,10 @@ def test_npe_vi_posterior_fits_several_observations(vi_method):
     trainer = NPE(prior, show_progress_bars=False)
     trainer.append_simulations(theta, theta + 0.3 * torch.randn_like(theta))
     trainer.train(max_num_epochs=1)
-    posterior = trainer.build_posterior(sample_with="vi", vi_method=vi_method)
+    posterior = trainer.build_posterior(
+        sample_with="vi",
+        posterior_parameters=VIPosteriorParameters(vi_method=vi_method),
+    )
 
     with pytest.warns(UserWarning, match="combined as iid trials"):
         posterior.train(x=zeros(3, 2), **TRAIN_KWARGS)

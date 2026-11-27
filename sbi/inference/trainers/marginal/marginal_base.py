@@ -77,7 +77,8 @@ class MarginalTrainer:
         self,
         density_estimator: Optional[DensityEstimatorType] = None,
         device: str = "cpu",
-        summary_writer: Optional[SummaryWriter] = None,
+        *,
+        summary_writer: None = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
@@ -92,8 +93,8 @@ class MarginalTrainer:
                 that model. Alternatively, a function that takes a batch of $x$
                 and returns an `UnconditionalDensityEstimator` can be provided.
             device: Device to use for training. Can be "cpu" or "cuda".
-            summary_writer: Deprecated alias for the TensorBoard summary writer.
-                Use ``tracker`` instead.
+            summary_writer: Removed in sbi v0.28.0; passing it raises a `TypeError`.
+                Use `tracker=TensorBoardTracker(summary_writer)` instead.
             tracker: Tracking adapter used to log training progress. If None,
                 a TensorBoard tracker is created.
             show_progress_bars: Whether to show progress bars during training.
@@ -106,14 +107,11 @@ class MarginalTrainer:
         self._val_loss = float("Inf")
 
         if summary_writer is not None:
-            warn(
-                "summary_writer is deprecated. Use tracker instead.",
-                FutureWarning,
-                stacklevel=2,
+            raise TypeError(
+                "`summary_writer` was removed in sbi v0.28.0. Pass "
+                "`tracker=TensorBoardTracker(summary_writer)` instead, with "
+                "`from sbi.utils.tracking import TensorBoardTracker`."
             )
-            if tracker is not None:
-                raise ValueError("Pass only one of summary_writer or tracker.")
-            tracker = TensorBoardTracker(summary_writer)
 
         self._tracker = self._default_tracker() if tracker is None else tracker
 

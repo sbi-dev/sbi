@@ -314,25 +314,6 @@ def test_plot_summary_overlay_kwargs_precedence(
     close()
 
 
-def test_plot_summary_deprecated_kwargs(mock_inference):
-    """Old kwargs `inference` and `disable_tensorboard_prompt` still work but
-    emit a FutureWarning."""
-    with pytest.warns(FutureWarning, match="`inference` is deprecated"):
-        fig, _ = plot_summary(
-            inference=mock_inference,
-            tags=["training_loss"],
-            verbose=False,
-        )
-    close()
-    with pytest.warns(FutureWarning, match="`disable_tensorboard_prompt`"):
-        fig, _ = plot_summary(
-            mock_inference,
-            tags=["training_loss"],
-            disable_tensorboard_prompt=True,
-        )
-    close()
-
-
 @pytest.mark.parametrize("kwarg", ("colors", "labels", "ylabel"))
 def test_plot_summary_length_validation(mock_inference, kwarg):
     """colors/labels/ylabel with wrong length must raise ValueError, not IndexError."""

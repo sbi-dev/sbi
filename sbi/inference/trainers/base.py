@@ -288,8 +288,9 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         self,
         prior: Optional[Distribution] = None,
         device: str = "cpu",
-        logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[SummaryWriter] = None,
+        logging_level: Optional[Union[int, str]] = None,
+        *,
+        summary_writer: None = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
@@ -301,10 +302,10 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
                 distribution, see FAQ for details on how to use custom distributions.
             device: torch device on which to train the neural net and on which to
                 perform all posterior operations, e.g. gpu or cpu.
-            logging_level: Minimum severity of messages to log. One of the strings
-               "INFO", "WARNING", "DEBUG", "ERROR" and "CRITICAL".
-            summary_writer: Deprecated alias for the TensorBoard summary writer.
-                Use ``tracker`` instead.
+            logging_level: Deprecated, it has no effect and goes in sbi v0.29.0.
+                Use `logging.getLogger("sbi").setLevel(...)` instead.
+            summary_writer: Removed in sbi v0.28.0; passing it raises a `TypeError`.
+                Use `tracker=TensorBoardTracker(summary_writer)` instead.
             tracker: Tracking adapter used to log training metrics. If None, a
                 TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show a progressbar during simulation and
@@ -334,15 +335,20 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         self._best_model_state_dict = None
         self._epochs_since_last_improvement = 0
 
-        if summary_writer is not None:
+        if logging_level is not None:
             warn(
-                "summary_writer is deprecated. Use tracker instead.",
+                "`logging_level` has no effect and will be removed in sbi v0.29.0. "
+                "Set the level of sbi's loggers instead, e.g. "
+                '`logging.getLogger("sbi").setLevel("INFO")`.',
                 FutureWarning,
-                stacklevel=2,
+                stacklevel=_stacklevel_to_caller(),
             )
-            if tracker is not None:
-                raise ValueError("Pass only one of summary_writer or tracker.")
-            tracker = TensorBoardTracker(summary_writer)
+        if summary_writer is not None:
+            raise TypeError(
+                "`summary_writer` was removed in sbi v0.28.0. Pass "
+                "`tracker=TensorBoardTracker(summary_writer)` instead, with "
+                "`from sbi.utils.tracking import TensorBoardTracker`."
+            )
 
         self._tracker = self._default_tracker() if tracker is None else tracker
 
@@ -628,8 +634,8 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
             self._validate_posterior_parameters_consistency(
                 posterior_parameters, **kwargs
             )
-        else:
-            self._raise_deprecation_warning(deprecated_params, **kwargs)
+        self._raise_deprecation_warning(deprecated_params, **kwargs)
+        if posterior_parameters is None:
             posterior_parameters = self._build_posterior_parameters(
                 sample_with, **kwargs
             )
@@ -670,8 +676,9 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
             posterior_parameters = FilteredDirectPosteriorParameters(**params)
         elif sample_with == "mcmc":
             params = kwargs.get("mcmc_parameters", {}) or {}
+            method = kwargs.get("mcmc_method")
             posterior_parameters = MCMCPosteriorParameters(
-                method=kwargs.get("mcmc_method", "slice_np_vectorized"), **params
+                **params, **({} if method is None else {"method": method})
             )
         elif sample_with in ("ode", "sde"):
             params = kwargs.get("vectorfield_sampling_parameters", {}) or {}
@@ -681,8 +688,9 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
             posterior_parameters = RejectionPosteriorParameters(**params)
         elif sample_with == "vi":
             params = kwargs.get("vi_parameters", {}) or {}
+            vi_method = kwargs.get("vi_method")
             posterior_parameters = VIPosteriorParameters(
-                vi_method=kwargs.get("vi_method", "rKL"), **params
+                **params, **({} if vi_method is None else {"vi_method": vi_method})
             )
         elif sample_with == "importance":
             params = kwargs.get("importance_sampling_parameters", {}) or {}
@@ -728,39 +736,31 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         self, deprecated_params: List[str], **kwargs
     ) -> None:
         """
-        Raise a deprecation warning if a deprecated posterior parameters or
-        non-default arguments are used.
+        Raise a deprecation warning if deprecated posterior parameters are used.
+
+        `mcmc_method` and `vi_method` count as used whenever they are set, also to
+        their old default values.
 
         Args:
             deprecated_params: List of deprecated posterior parameter names provided.
             **kwargs: Additional keyword arguments.
         """
 
-        deprecated_params = deprecated_params.copy()
-        default_mcmc_method = "slice_np_vectorized"
-        default_vi_method = "rKL"
-
-        # Check if deprecated parameters are used
-        if (
-            kwargs.get("mcmc_method") is not None
-            and kwargs.get("mcmc_method") != default_mcmc_method
-        ):
-            deprecated_params.append("mcmc_method")
-        if (
-            kwargs.get("vi_method") is not None
-            and kwargs.get("vi_method") != default_vi_method
-        ):
-            deprecated_params.append("vi_method")
+        deprecated_params = deprecated_params + [
+            name
+            for name in ("mcmc_method", "vi_method")
+            if kwargs.get(name) is not None
+        ]
 
         if deprecated_params:
             warnings.warn(
                 f"The following arguments are deprecated and"
-                " will be removed in a future version: "
+                " will be removed in sbi v0.29.0: "
                 f"{', '.join(deprecated_params)}. Please use `posterior_parameters`"
                 " instead. Refer to this guide for details:\n"
                 "https://sbi.readthedocs.io/en/latest/how_to_guide/19_posterior_parameters.html#",
                 FutureWarning,
-                stacklevel=2,
+                stacklevel=_stacklevel_to_caller(),
             )
 
     def _validate_no_duplicate_parameters(self, deprecated_params: List[str]) -> None:
@@ -803,22 +803,19 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
             )
         elif isinstance(posterior_parameters, MCMCPosteriorParameters):
             mcmc_method = kwargs.get("mcmc_method")
-            if (
-                mcmc_method != "slice_np_vectorized"
-                and posterior_parameters.method != mcmc_method
-            ):
+            if mcmc_method is not None and posterior_parameters.method != mcmc_method:
                 warnings.warn(
                     f"Conflicting mcmc_method='{mcmc_method}' ignored in favor of "
                     f"posterior_parameters.method='{posterior_parameters.method}'",
-                    stacklevel=2,
+                    stacklevel=_stacklevel_to_caller(),
                 )
         elif isinstance(posterior_parameters, VIPosteriorParameters):
             vi_method = kwargs.get("vi_method")
-            if vi_method != "rKL" and posterior_parameters.vi_method != vi_method:
+            if vi_method is not None and posterior_parameters.vi_method != vi_method:
                 warnings.warn(
                     f"Conflicting vi_method='{vi_method}' ignored in favor of "
                     f"posterior_parameters.vi_method='{posterior_parameters.vi_method}'",
-                    stacklevel=2,
+                    stacklevel=_stacklevel_to_caller(),
                 )
 
     def _create_posterior(
@@ -1400,8 +1397,9 @@ class NeuralInference(
         self,
         prior: Optional[Distribution] = None,
         device: str = "cpu",
-        logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[SummaryWriter] = None,
+        logging_level: Optional[Union[int, str]] = None,
+        *,
+        summary_writer: None = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
@@ -1606,8 +1604,9 @@ class MaskedNeuralInference(
         posterior_observed_idx: Optional[list | Tensor] = None,
         prior: Optional[Distribution] = None,
         device: str = "cpu",
-        logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[SummaryWriter] = None,
+        logging_level: Optional[Union[int, str]] = None,
+        *,
+        summary_writer: None = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
@@ -1624,10 +1623,10 @@ class MaskedNeuralInference(
                 support and by the iid sampling methods. Training does not use it.
             device: torch device on which to train the neural net and on which to
                 perform all posterior operations, e.g. gpu or cpu.
-            logging_level: Minimum severity of messages to log. One of the strings
-               "INFO", "WARNING", "DEBUG", "ERROR" and "CRITICAL".
-            summary_writer: A `SummaryWriter` to control, among others, log
-                file location (default is `<current working directory>/logs`.)
+            logging_level: Deprecated, it has no effect and goes in sbi v0.29.0.
+                Use `logging.getLogger("sbi").setLevel(...)` instead.
+            summary_writer: Removed in sbi v0.28.0; passing it raises a `TypeError`.
+                Use `tracker=TensorBoardTracker(summary_writer)` instead.
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
         """

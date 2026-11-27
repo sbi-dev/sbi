@@ -38,7 +38,6 @@ from sbi.inference.posteriors import (
 )
 from sbi.inference.potentials import (
     likelihood_estimator_based_potential,
-    mixed_likelihood_estimator_based_potential,
     posterior_estimator_based_potential,
     ratio_estimator_based_potential,
     vector_field_estimator_based_potential,
@@ -68,7 +67,6 @@ __all__ = (
         "simulate_from_theta",
         "infer",
         "likelihood_estimator_based_potential",
-        "mixed_likelihood_estimator_based_potential",
         "posterior_estimator_based_potential",
         "ratio_estimator_based_potential",
         "vector_field_estimator_based_potential",

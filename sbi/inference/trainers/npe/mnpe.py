@@ -5,7 +5,6 @@ import warnings
 from typing import Any, ClassVar, Dict, Literal, Optional, Tuple, Union
 
 from torch.distributions import Distribution
-from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.posterior_parameters import (
@@ -81,8 +80,9 @@ class MNPE(NPE_C):
             None,
         ] = None,
         device: str = "cpu",
-        logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[SummaryWriter] = None,
+        logging_level: Optional[Union[int, str]] = None,
+        *,
+        summary_writer: None = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
@@ -101,10 +101,10 @@ class MNPE(NPE_C):
                 can thus be used for shape inference and potentially for
                 z-scoring.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
-            logging_level: Minimum severity of messages to log. One of the strings
-                INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: Deprecated alias for the TensorBoard summary writer.
-                Use ``tracker`` instead.
+            logging_level: Deprecated, it has no effect and goes in sbi v0.29.0.
+                Use `logging.getLogger("sbi").setLevel(...)` instead.
+            summary_writer: Removed in sbi v0.28.0; passing it raises a `TypeError`.
+                Use `tracker=TensorBoardTracker(summary_writer)` instead.
             tracker: Tracking adapter used to log training metrics. If None, a
                 TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show a progressbar during simulation and
@@ -160,16 +160,18 @@ class MNPE(NPE_C):
         sample_with: Literal[
             "mcmc", "rejection", "vi", "importance", "direct"
         ] = "direct",
-        mcmc_method: Literal[
-            "slice_np",
-            "slice_np_vectorized",
-            "hmc_pyro",
-            "nuts_pyro",
-            "slice_pymc",
-            "hmc_pymc",
-            "nuts_pymc",
-        ] = "slice_np_vectorized",
-        vi_method: Literal["rKL", "fKL", "IW", "alpha"] = "rKL",
+        mcmc_method: Optional[
+            Literal[
+                "slice_np",
+                "slice_np_vectorized",
+                "hmc_pyro",
+                "nuts_pyro",
+                "slice_pymc",
+                "hmc_pymc",
+                "nuts_pymc",
+            ]
+        ] = None,
+        vi_method: Optional[Literal["rKL", "fKL", "IW", "alpha"]] = None,
         direct_sampling_parameters: Optional[Dict[str, Any]] = None,
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         vi_parameters: Optional[Dict[str, Any]] = None,
@@ -193,7 +195,9 @@ class MNPE(NPE_C):
             prior: Prior distribution.
             sample_with: Method to use for sampling from the posterior. Must be one of
                 [`direct` | `mcmc` | `rejection` | `vi` | `importance`].
-            mcmc_method: Method used for MCMC sampling, one of `slice_np`,
+            mcmc_method: Deprecated, removed in sbi v0.29.0: pass
+                `MCMCPosteriorParameters(method=...)` instead. Method used for MCMC
+                sampling (default `slice_np_vectorized`), one of `slice_np`,
                 `slice_np_vectorized`, `hmc_pyro`, `nuts_pyro`, `slice_pymc`,
                 `hmc_pymc`, `nuts_pymc`. `slice_np` is a custom
                 numpy implementation of slice sampling. `slice_np_vectorized` is
@@ -201,7 +205,9 @@ class MNPE(NPE_C):
                 vectorized for `slice_np_vectorized` whereas they are run sequentially
                 for `slice_np`. The samplers ending on `_pyro` are using Pyro, and
                 likewise the samplers ending on `_pymc` are using PyMC.
-            vi_method: Method used for VI, one of [`rKL`, `fKL`, `IW`, `alpha`].
+            vi_method: Deprecated, removed in sbi v0.29.0: pass
+                `VIPosteriorParameters(vi_method=...)` instead. Method used for VI
+                (default `rKL`), one of [`rKL`, `fKL`, `IW`, `alpha`].
             direct_sampling_parameters: Additional kwargs passed to `DirectPosterior`.
             mcmc_parameters: Additional kwargs passed to `MCMCPosterior`.
             vi_parameters: Additional kwargs passed to `VIPosterior`.

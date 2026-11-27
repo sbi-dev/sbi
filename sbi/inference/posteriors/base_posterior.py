@@ -51,7 +51,6 @@ class NeuralPosterior:
         potential_fn: Union[BasePotential, CustomPotential],
         theta_transform: Optional[TorchTransform] = None,
         device: Optional[Union[str, torch.device]] = None,
-        x_shape: Optional[torch.Size] = None,
     ):
         """
         Args:
@@ -61,15 +60,7 @@ class NeuralPosterior:
                 Allows to perform, e.g. MCMC in unconstrained space.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
-            x_shape: Deprecated, should not be passed.
         """
-        if x_shape is not None:
-            warn(
-                "x_shape is not None. However, passing x_shape to the `Posterior` is "
-                "deprecated and will be removed in a future release of `sbi`.",
-                stacklevel=2,
-            )
-
         # Wrap custom potential functions to adhere to the `BasePotential` interface.
         if not isinstance(potential_fn, BasePotential):
             potential_device = "cpu" if device is None else device

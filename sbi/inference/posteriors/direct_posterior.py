@@ -67,7 +67,7 @@ class DirectPosterior(NeuralPosterior):
         prior: Distribution,
         max_sampling_batch_size: int = 10_000,
         device: Optional[Union[str, torch.device]] = None,
-        x_shape: Optional[torch.Size] = None,
+        *,
         enable_transform: bool = True,
     ):
         """
@@ -78,7 +78,6 @@ class DirectPosterior(NeuralPosterior):
                 the proposal at every iteration.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
-            x_shape: Deprecated, should not be passed.
             enable_transform: Whether to transform parameters to unconstrained space
                 during MAP optimization. When False, an identity transform will be
                 returned for `theta_transform`.
@@ -88,7 +87,6 @@ class DirectPosterior(NeuralPosterior):
         # obtaining the MAP.
         check_prior(prior)
         self.enable_transform = enable_transform
-        self.x_shape = x_shape
         potential_fn, theta_transform = posterior_estimator_based_potential(
             posterior_estimator,
             prior,
@@ -100,7 +98,6 @@ class DirectPosterior(NeuralPosterior):
             potential_fn=potential_fn,
             theta_transform=theta_transform,
             device=device,
-            x_shape=x_shape,
         )
 
         self.device = device
