@@ -1089,6 +1089,56 @@ def test_rollback_keeps_the_optimizer_settings(monkeypatch):
     assert not optimizer._optimizer.state
 
 
+def test_alpha_loss_at_alpha_one_is_the_elbo(monkeypatch):
+    """At alpha = 1 the displayed loss is the negative ELBO, not the formula's 0 / 0,
+    which would never let training converge."""
+    prior = MultivariateNormal(zeros(1), eye(1))
+    optimizer = RenyiDivergenceOptimizer(
+        potential_fn=FakePotential(prior=prior),
+        q=LearnableGaussian(dim=1, full_covariance=False),
+        prior=prior,
+        n_particles=4,
+        alpha=1.0,
+        lr=1e-3,
+        gamma=0.999,
+    )
+    elbo_particles = torch.tensor([-1.0, -2.0, -3.0, -4.0])
+    monkeypatch.setattr(
+        optimizer,
+        "generate_elbo_particles",
+        lambda x_o, num_samples=None: elbo_particles,
+    )
+    _, loss = optimizer.loss(zeros(1))
+    assert torch.allclose(loss, torch.tensor(2.5))
+
+
+def test_optimizer_without_lr_gets_the_default_lr():
+    """Without `lr`, the optimizer gets sbi's default, not torch's (1.0 for
+    Adadelta)."""
+    prior = MultivariateNormal(zeros(1), eye(1))
+    optimizer = ForwardKLOptimizer(
+        potential_fn=FakePotential(prior=prior),
+        q=LearnableGaussian(dim=1, full_covariance=False),
+        prior=prior,
+        optimizer=torch.optim.Adadelta,
+        gamma=0.999,
+    )
+    assert optimizer._optimizer.param_groups[0]["lr"] == 1e-3
+
+
+def test_reset_loss_stats_snapshots_the_current_q():
+    """Each `train` call starts with a snapshot of the current q, so a rollback in it
+    does not restore a q from an earlier call."""
+    optimizer = _optimizer_after_losses([2.0])
+    with torch.no_grad():
+        for p in optimizer.q.parameters():
+            p.add_(1.0)
+    optimizer.reset_loss_stats()
+    q_params = optimizer.q.parameters()
+    for p_snapshot, p in zip(optimizer.state_dict, q_params, strict=True):
+        assert torch.equal(p_snapshot, p)
+
+
 @pytest.mark.parametrize("optimizer_class", [IWElboOptimizer, RenyiDivergenceOptimizer])
 @pytest.mark.parametrize("dreg_before, dreg_after", [(False, True), (True, False)])
 def test_dreg_changed_by_update_matches_new_optimizer(
