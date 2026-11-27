@@ -112,7 +112,7 @@ def test_count_accepted_stops_at_target_or_cap_within_batch_size():
         proposal,
         lambda theta: theta == 0,
         num_xos=2,
-        num_accepted=10,
+        target_accepted=10,
         max_num_draws=75,
         max_sampling_batch_size=40,
     )

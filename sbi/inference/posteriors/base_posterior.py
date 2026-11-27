@@ -649,6 +649,7 @@ def _support_mass(num_accepted: Tensor, num_drawn: Tensor, hint: str) -> Tensor:
         )
         if empty.any():
             num_draws = int(num_drawn[empty].min())
+            # Rule of three: with 0 hits in n draws, 3 / n is the 95% upper bound.
             message += (
                 f" {int(empty.sum())} have none in {num_draws} draws: their mass is "
                 f"below about {3 / num_draws:.1e}, and `log_prob()` returns NaN "

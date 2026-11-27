@@ -553,7 +553,7 @@ class VectorFieldPosterior(NeuralPosterior):
                 ),
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_xos=1,
-                num_accepted=num_rejection_samples,
+                target_accepted=num_rejection_samples,
                 max_num_draws=max_num_draws,
                 max_sampling_batch_size=self.max_sampling_batch_size,
             )

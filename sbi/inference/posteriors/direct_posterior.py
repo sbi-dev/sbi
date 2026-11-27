@@ -491,7 +491,7 @@ class DirectPosterior(NeuralPosterior):
                 proposal=proposal,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_xos=condition.shape[0],
-                num_accepted=num_rejection_samples,
+                target_accepted=num_rejection_samples,
                 max_num_draws=max_num_draws,
                 max_sampling_batch_size=rejection_sampling_batch_size,
                 show_progress_bars=show_progress_bars,

@@ -489,16 +489,16 @@ def count_accepted(
     proposal: Callable[[int, Tensor], Tensor],
     accept_reject_fn: AcceptRejectFn,
     num_xos: int,
-    num_accepted: int,
+    target_accepted: int,
     max_num_draws: int,
     max_sampling_batch_size: int = 10_000,
     show_progress_bars: bool = False,
 ) -> Tuple[Tensor, Tensor]:
     r"""Count accepted proposal draws per observation to estimate acceptance rates.
 
-    For every observation, draws until `num_accepted` draws are accepted or
+    For every observation, draws until `target_accepted` draws are accepted or
     `max_num_draws` draws are made. The draws are counted, not kept. Observations go
-    in chunks that fit `num_accepted` draws each into one call of `proposal`, and one
+    in chunks that fit `target_accepted` draws each into one call of `proposal`, and one
     call gets at most `max_sampling_batch_size` draws, so memory does not grow with
     the number of draws or observations.
 
@@ -509,7 +509,7 @@ def count_accepted(
         accept_reject_fn: A callable following the `AcceptRejectFn` protocol that
             returns which draws are accepted.
         num_xos: Number of observations.
-        num_accepted: Number of accepted draws after which an observation stops.
+        target_accepted: Number of accepted draws after which an observation stops.
         max_num_draws: Number of draws after which an observation stops, whatever it
             accepted.
         max_sampling_batch_size: Maximum number of draws per call of `proposal`.
@@ -518,9 +518,9 @@ def count_accepted(
     Returns:
         Number of accepted draws and number of draws, one per observation.
     """
-    if not 1 <= num_accepted <= max_num_draws or max_sampling_batch_size < 1:
+    if not 1 <= target_accepted <= max_num_draws or max_sampling_batch_size < 1:
         raise ValueError(
-            f"Cannot collect {num_accepted} accepted draws with at most "
+            f"Cannot collect {target_accepted} accepted draws with at most "
             f"{max_num_draws} draws and {max_sampling_batch_size} draws at once: "
             "`num_rejection_samples` must be at least 1 and at most `max_num_draws`, "
             "and the batch size at least 1."
@@ -532,14 +532,16 @@ def count_accepted(
         total=num_xos,
         desc=f"Counting accepted draws for {num_xos} observation(s)",
     )
-    chunk_size = max(1, max_sampling_batch_size // num_accepted)
+    chunk_size = max(1, max_sampling_batch_size // target_accepted)
     for pending in torch.arange(num_xos, device="cpu").split(chunk_size):
         # Pending observations get the same draws in every step, so one count holds.
         num_drawn = 0
         while pending.numel() > 0:
-            # Aim at the slowest pending observation, within the batch and the cap.
+            # Aim at the slowest pending observation: draw the expected number of draws
+            # for its missing hits, at its rate so far; before its first hit, draw
+            # twice as many as so far. Stay within the batch size and the cap.
             fewest = int(accepted[pending].min())
-            num_draws = num_accepted - fewest
+            num_draws = target_accepted - fewest
             if fewest > 0:
                 num_draws = math.ceil(num_draws * num_drawn / fewest)
             elif num_drawn > 0:
@@ -553,7 +555,7 @@ def count_accepted(
             accepted[pending] += are_accepted.reshape(num_draws, -1).sum(dim=0).cpu()
             num_drawn += num_draws
 
-            done = (accepted[pending] >= num_accepted) | (num_drawn >= max_num_draws)
+            done = (accepted[pending] >= target_accepted) | (num_drawn >= max_num_draws)
             drawn[pending[done]] = num_drawn
             pbar.update(int(done.sum()))
             pending = pending[~done]
