@@ -242,10 +242,12 @@ class DivergenceOptimizer(ABC):
         for state_para, para in zip(self.state_dict, self.q.parameters(), strict=False):
             para.data = state_para.data.clone().to(para.device)
         # The state from before any step (Adagrad builds one in its constructor), a
-        # copy as the optimizer updates it in place. The live parameter groups stay,
-        # with every setting, including a scheduler's.
+        # copy as the optimizer updates it in place, with the current settings,
+        # including a scheduler's. The live parameter groups stay.
         param_groups = self._optimizer.param_groups
-        self._optimizer.load_state_dict(deepcopy(self._fresh_optimizer_state))
+        optimizer_state = deepcopy(self._fresh_optimizer_state)
+        optimizer_state["param_groups"] = self._optimizer.state_dict()["param_groups"]
+        self._optimizer.load_state_dict(optimizer_state)
         self._optimizer.param_groups = param_groups
         if self.prior is not None:
             self.warm_up(warm_up_rounds)
