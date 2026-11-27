@@ -303,11 +303,12 @@ def standardizing_transform(
 
 
 class _CenteredPointwiseAffineTransform(nflows_tf.PointwiseAffineTransform):
-    """z-scoring as `(x - mean) * scale`, with `mean = -shift / scale`.
+    """z-scoring as `(x - mean) * scale`, inverse `z / scale + mean`, with
+    `mean = -shift / scale`.
 
-    The parent's `x * scale + shift` rounds `x * scale`, which is about mean / std,
-    before the shift cancels it, and so can merge distinct float32 values. The
-    buffers are the parent's, so state dicts load in both directions.
+    The parent's `x * scale + shift` and `(z - shift) / scale` round a term of
+    about mean / std before it cancels, and so can merge distinct float32 values.
+    The buffers are the parent's, so state dicts load in both directions.
     """
 
     def forward(
@@ -318,14 +319,26 @@ class _CenteredPointwiseAffineTransform(nflows_tf.PointwiseAffineTransform):
         outputs = (inputs - mean) * self._scale
         return outputs, self._batch_logabsdet(batch_shape).expand(batch_size)
 
+    def inverse(
+        self, inputs: Tensor, context: Optional[Tensor] = None
+    ) -> Tuple[Tensor, Tensor]:
+        batch_size, *batch_shape = inputs.size()
+        mean = -self._shift / self._scale
+        outputs = inputs / self._scale + mean
+        return outputs, -self._batch_logabsdet(batch_shape).expand(batch_size)
+
 
 class _CenteredAffineTransform(AffineTransform):
-    """z-scoring as `(x - mean) * scale`, with `mean = -loc / scale`; see
-    `_CenteredPointwiseAffineTransform`."""
+    """`AffineTransform` with the arithmetic of `_CenteredPointwiseAffineTransform`,
+    with `mean = -loc / scale`."""
 
     def _call(self, x: Tensor) -> Tensor:
         mean = -self.loc / self.scale
         return (x - mean) * self.scale
+
+    def _inverse(self, y: Tensor) -> Tensor:
+        mean = -self.loc / self.scale
+        return y / self.scale + mean
 
 
 # NOTE: we need a separate function for zuko to return the precise type for pyright.
@@ -468,9 +481,12 @@ def z_standardization(
 
     constant = values.amax(dim=0) == values.amin(dim=0)
     t_mean = torch.where(constant, values[0], t_mean)
-    # Centre before the std: else the rounding of the float32 mean adds to the
-    # variance. `valid_t` is a copy, so this works in place.
-    t_std = values.sub_(t_mean).std(dim=0)
+    # A float32 mean can be steps off; the mean of the centred values corrects it,
+    # and centring keeps that error out of the std. `valid_t` is a copy, so this
+    # works in place.
+    values.sub_(t_mean)
+    t_mean = t_mean + values.mean(dim=0)
+    t_std = values.std(dim=0)
     _warn_if_below_float32_resolution(t_mean, t_std, constant)
     t_std = torch.where(constant, torch.ones_like(t_std), t_std)
     return t_mean, t_std.clamp(min=min_std)

@@ -16,6 +16,7 @@ from dataclasses import fields as dc_fields
 
 import pytest
 import torch
+from nflows.transforms import PointwiseAffineTransform
 
 from sbi.neural_nets.estimators import MixedDensityEstimator
 from sbi.neural_nets.factory import (
@@ -39,6 +40,7 @@ from sbi.neural_nets.net_builders.estimator_configs import (
 )
 from sbi.neural_nets.net_builders.mixed_nets import build_mnle
 from sbi.utils.nn_utils import check_net_device
+from sbi.utils.sbiutils import Standardize
 
 THETA, X = torch.randn(100, 3), torch.randn(100, 5)
 
@@ -447,7 +449,7 @@ def test_none_means_no_z_scoring(factory_fn, z_kwargs):
         return [
             type(m).__name__
             for m in net.modules()
-            if type(m).__name__ in ("Standardize", "_CenteredPointwiseAffineTransform")
+            if isinstance(m, (Standardize, PointwiseAffineTransform))
         ]
 
     assert standardizing(from_none) == []

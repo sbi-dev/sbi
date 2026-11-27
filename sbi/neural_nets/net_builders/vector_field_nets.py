@@ -1555,11 +1555,12 @@ def _finite_z_score_stats(
         )
     mean = values.sum(dim=dims) / count.clamp(min=1)
     centered = torch.where(finite, batch_x - mean, torch.zeros_like(batch_x))
-    # Corrected two-pass: the second term removes the rounding of the float32 mean.
-    correction = centered.sum(dim=dims) ** 2 / count.clamp(min=1)
-    sum_sq = centered.pow(2).sum(dim=dims) - correction
-    var = sum_sq.clamp(min=0) / (count - 1).clamp(min=1)
-    mean = torch.where(constant, highest, mean)
+    # A float32 mean can be steps off: centre a second time on the mean of the
+    # centred values, which keeps that error out of the std.
+    residual = centered.sum(dim=dims) / count.clamp(min=1)
+    centered = torch.where(finite, centered - residual, torch.zeros_like(centered))
+    var = centered.pow(2).sum(dim=dims) / (count - 1).clamp(min=1)
+    mean = torch.where(constant, highest, mean + residual)
     _warn_if_below_float32_resolution(mean, var.sqrt(), constant | too_few)
     std = torch.where(constant | too_few, torch.ones_like(var), var).sqrt()
     return mean, std.clamp(min=min_std)

@@ -1049,16 +1049,21 @@ def test_constant_features_are_centred_not_rescaled(stats_fn):
 
 
 def test_z_scoring_keeps_float32_resolution():
-    """Eight consecutive float32 values at 1e6 keep their exact std, and the flows'
-    z-scoring keeps them distinct."""
+    """Data a few float32 steps wide at a large level keep their mean and std, and
+    the flows' z-scoring and its inverse keep neighbouring values distinct."""
+    batch = torch.full((1000, 1), 1e8)
+    batch[0] += 8  # one float32 step
     x = (1e6 + 0.0625 * torch.arange(8, dtype=torch.float64)).float().unsqueeze(1)
-    std = x.double().std().float()
 
     with pytest.warns(UserWarning, match="float32"):
         for stats_fn in (z_standardization, _finite_z_score_stats):
             for structured in (False, True):
-                assert torch.allclose(stats_fn(x, structured)[1], std)
-        z_nflows, _ = standardizing_transform(x)(x)
-        z_zuko = standardizing_transform_zuko(x)()(x)
+                mean, std = stats_fn(batch, structured)
+                assert mean == 1e8
+                assert torch.allclose(std, batch.double().std().float())
+        nflows = standardizing_transform(x)
+        zuko_t = standardizing_transform_zuko(x)()
 
-    assert z_nflows.unique().numel() == z_zuko.unique().numel() == 8
+    z_nflows, z_zuko = nflows(x)[0], zuko_t(x)
+    for out in (z_nflows, z_zuko, nflows.inverse(z_nflows)[0], zuko_t.inv(z_zuko)):
+        assert out.unique().numel() == 8
