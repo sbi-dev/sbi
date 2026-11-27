@@ -1050,7 +1050,8 @@ def test_constant_features_are_centred_not_rescaled(stats_fn):
 
 def test_z_scoring_keeps_float32_resolution():
     """Data a few float32 steps wide at a large level keep their mean and std, and
-    the flows' z-scoring and its inverse keep neighbouring values distinct."""
+    the flows' z-scoring and its inverse keep neighbouring values distinct and map
+    the mean to zero."""
     batch = torch.full((1000, 1), 1e8)
     batch[0] += 8  # one float32 step
     x = (1e6 + 0.0625 * torch.arange(8, dtype=torch.float64)).float().unsqueeze(1)
@@ -1061,9 +1062,11 @@ def test_z_scoring_keeps_float32_resolution():
                 mean, std = stats_fn(batch, structured)
                 assert mean == 1e8
                 assert torch.allclose(std, batch.double().std().float())
+        x_mean, _ = z_standardization(x)
         nflows = standardizing_transform(x)
         zuko_t = standardizing_transform_zuko(x)()
 
     z_nflows, z_zuko = nflows(x)[0], zuko_t(x)
     for out in (z_nflows, z_zuko, nflows.inverse(z_nflows)[0], zuko_t.inv(z_zuko)):
         assert out.unique().numel() == 8
+    assert nflows(x_mean[None])[0] == 0 and zuko_t(x_mean[None]) == 0

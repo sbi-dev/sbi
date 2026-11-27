@@ -299,7 +299,25 @@ def standardizing_transform(
         Affine transform for z-scoring
     """
     t_mean, t_std = z_standardization(batch_t, structured_dims, min_std)
-    return _CenteredPointwiseAffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
+    shift, scale = _z_score_affine(t_mean, t_std)
+    return _CenteredPointwiseAffineTransform(shift=shift, scale=scale)
+
+
+def _z_score_affine(mean: Tensor, std: Tensor) -> Tuple[Tensor, Tensor]:
+    """`shift` and `scale` of the z-scoring `x * scale + shift`, chosen so that
+    `-shift / scale`, which the centred transforms compute, gives back `mean`.
+
+    Rounding would otherwise move the centre by up to a float32 step of the mean,
+    several stds when the spread is only a few steps wide. Up to 64 float32 steps
+    more in `scale` (a relative change below 1e-5) make the division exact.
+    """
+    scale = 1 / std
+    for _ in range(64):
+        off = mean * scale / scale != mean
+        if not off.any():
+            break
+        scale = torch.where(off, torch.nextafter(scale, scale + 1), scale)
+    return -mean * scale, scale
 
 
 class _CenteredPointwiseAffineTransform(nflows_tf.PointwiseAffineTransform):
@@ -362,11 +380,9 @@ def standardizing_transform_zuko(
         Affine transform for z-scoring
     """
     t_mean, t_std = z_standardization(batch_t, structured_dims, min_std)
+    loc, scale = _z_score_affine(t_mean, t_std)
     return zuko.flows.UnconditionalTransform(
-        _CenteredAffineTransform,
-        loc=-t_mean / t_std,
-        scale=1 / t_std,
-        buffer=True,
+        _CenteredAffineTransform, loc=loc, scale=scale, buffer=True
     )
 
 
@@ -504,9 +520,13 @@ def _warn_if_below_resolution(mean: Tensor, std: Tensor, skip: Tensor) -> None:
     eps = torch.finfo(std.dtype).eps
     low = ~skip & (std < 1000 * eps * mean.abs())
     if low.any():
-        where = f"Dimension(s) {low.flatten().nonzero().flatten().tolist()}"
+        where = (
+            f"Dimension(s) {low.flatten().nonzero().flatten().tolist()}"
+            if low.ndim
+            else "The data"
+        )
         warnings.warn(
-            f"{where if low.ndim else 'The data'} have a std below {1000 * eps:.0e} "
+            f"{where} have a std below {1000 * eps:.1e} "
             f"of their mean, so {std.dtype} resolves fewer than about 1000 values "
             "per std. Subtract an offset before training (and from the prior, for "
             "parameters).",
