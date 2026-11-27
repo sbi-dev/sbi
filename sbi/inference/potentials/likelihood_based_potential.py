@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import warnings
 from typing import Callable, List, Optional, Tuple, Union
 
 import torch
@@ -9,10 +8,7 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import BasePotential, unpaired_batch_error
-from sbi.neural_nets.estimators import (
-    ConditionalDensityEstimator,
-    MixedDensityEstimator,
-)
+from sbi.neural_nets.estimators import ConditionalDensityEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
     reshape_to_sample_batch_event,
@@ -410,58 +406,3 @@ def _log_likelihood_over_iid_trials_and_local_theta(
 
     # remove xs batch dimension
     return log_likelihood_trial_sum.squeeze(0)
-
-
-def mixed_likelihood_estimator_based_potential(
-    likelihood_estimator: MixedDensityEstimator,
-    prior: Distribution,
-    x_o: Optional[Tensor],
-) -> Tuple[Callable, TorchTransform]:
-    r"""Returns $\log(p(x_o|\theta)p(\theta))$ for mixed likelihood-based methods.
-
-    It also returns a transformation that can be used to transform the potential into
-    unconstrained space.
-
-    Args:
-        likelihood_estimator: The neural network modelling the likelihood.
-        prior: The prior distribution.
-        x_o: The observed data at which to evaluate the likelihood.
-
-    Returns:
-        The potential function $p(x_o|\theta)p(\theta)$ and a transformation that maps
-        to unconstrained space.
-    """
-
-    warnings.warn(
-        "This function is deprecated and will be removed in a future release. Use "
-        "`likelihood_estimator_based_potential` instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
-    device = str(next(likelihood_estimator.discrete_net.parameters()).device)
-
-    potential_fn = MixedLikelihoodBasedPotential(
-        likelihood_estimator, prior, x_o, device=device
-    )
-    theta_transform = mcmc_transform(prior, device=device)
-
-    return potential_fn, theta_transform
-
-
-class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
-    def __init__(
-        self,
-        likelihood_estimator: MixedDensityEstimator,
-        prior: Distribution,
-        x_o: Optional[Tensor],
-        device: str = "cpu",
-    ):
-        super().__init__(likelihood_estimator, prior, x_o, device)
-
-        warnings.warn(
-            "This function is deprecated and will be removed in a future release. Use "
-            "`LikelihoodBasedPotential` instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )

@@ -6,6 +6,7 @@
 
 * **`PermutationInvariantEmbedding` passes log(1 + N) instead of the trial count N** ([#2113](https://github.com/sbi-dev/sbi/pull/2113)): the embedding appended the raw number of real trials N to the aggregated trial embedding before its fully connected net. With 100 trials, that input was about 100 next to inputs of order 1, which scales badly when the number of trials varies. It now appends log(1 + N), which is 0 for an observation without real trials.
   * A network trained before this change gives different outputs after it, also when it was saved with `save()` or pickled whole, because the forward pass changed. Retrain it.
+* **`mixed_likelihood_estimator_based_potential` and `MixedLikelihoodBasedPotential` are removed** ([#XXXX](https://github.com/sbi-dev/sbi/pull/XXXX)): both were deprecated in v0.23.3 ([#1331](https://github.com/sbi-dev/sbi/pull/1331)). Use `likelihood_estimator_based_potential`, which gives the same potential for an `MNLE` estimator. Importing the removed function raises an `ImportError` that names it.
 
 ## v0.27.0
 
