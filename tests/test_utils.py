@@ -7,7 +7,8 @@ from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import pytest
 import torch
-from torch import Tensor
+import zuko
+from torch import Tensor, nn
 from torch.distributions import Distribution
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
@@ -310,3 +311,12 @@ class TractablePosterior(NeuralPosterior):
             show_progress_bars=show_progress_bars,
             force_update=force_update,
         )
+
+
+def zuko_hidden_layer_widths(flow: nn.Module) -> list[list[int]]:
+    """Return the hidden-layer widths of each autoregressive network in a Zuko flow."""
+    return [
+        [layer.out_features for layer in mlp if isinstance(layer, nn.Linear)][:-1]
+        for mlp in flow.modules()
+        if isinstance(mlp, zuko.nn.MaskedMLP)
+    ]
