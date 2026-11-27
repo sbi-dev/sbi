@@ -83,11 +83,13 @@ class RejectionPosterior(NeuralPosterior):
             `len($\theta$)`-shaped log-probability.
         """
         warn(
-            "`.log_prob()` is deprecated for methods that can only evaluate the "
-            "log-probability up to a normalizing constant. Use `.potential()` instead.",
+            f"`{type(self).__name__}.log_prob()` is deprecated and will be removed in "
+            "sbi v0.29.0, because this posterior can only evaluate the log-probability "
+            "up to a normalizing constant. Use `.potential(theta, x)`, which returns "
+            "the same values.",
+            FutureWarning,
             stacklevel=2,
         )
-        warn("The log-probability is unnormalized!", stacklevel=2)
 
         self.potential_fn = self._bind_iid(self._x_else_default_x(x))
 
