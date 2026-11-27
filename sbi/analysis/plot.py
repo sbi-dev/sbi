@@ -1786,7 +1786,7 @@ def _sbc_rank_plot(
         ranks_list = [ranks]
     else:
         assert isinstance(ranks, List)
-        ranks_list = ranks
+        ranks_list = list(ranks)
     for idx, rank in enumerate(ranks_list):
         assert isinstance(rank, (Tensor, np.ndarray))
         # Bin in float64, like the bands: float32 edges can shift a rank by one bin.
