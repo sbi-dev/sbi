@@ -319,7 +319,8 @@ class DivergenceOptimizer(ABC):
         current q."""
         self._clear_loss_stats()
         self._num_updates = 0
-        self.update_state()
+        # Rebuilt, as `update` may have swapped q for one with other parameters.
+        self.state_dict = [para.data.clone() for para in self.q.parameters()]
 
     def _clear_loss_stats(self) -> None:
         self.losses = torch.ones(2000)
