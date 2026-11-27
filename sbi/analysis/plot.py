@@ -1748,9 +1748,10 @@ def sbc_rank_plot(
     Additional options can be passed via the kwargs argument, see _sbc_rank_plot.
 
     Args:
-        ranks: Tensor of ranks to be plotted shape (num_sbc_runs, num_parameters), or
-            list of Tensors when comparing several sets of ranks, e.g., set of ranks
-            obtained from different methods.
+        ranks: Tensor of ranks to be plotted shape (num_sbc_runs, num_parameters),
+            or (num_sbc_runs,) for a single parameter, or list of Tensors when
+            comparing several sets of ranks, e.g., set of ranks obtained from
+            different methods.
         num_posterior_samples: number of posterior samples used to compute the
             ranks. Ranks must lie in [0, num_posterior_samples].
         num_bins: number of bins used for binning the ranks, default is
@@ -1761,6 +1762,10 @@ def sbc_rank_plot(
         parameter_labels: list of labels for each parameter dimension.
         ranks_labels: list of labels for each set of ranks.
         colors: list of colors for each parameter dimension, or each set of ranks.
+        fig: figure object to plot in, defaults to the figure of `ax`.
+        ax: Axes to plot in: a single Axes, or an array with at least as many
+            subplots as parameters when they are plotted in separate subplots.
+        figsize: dimensions of figure object, default (8, 5) or (len(ranks) * 4, 5).
 
     Returns:
         fig, ax: figure and axis objects.
@@ -1811,9 +1816,10 @@ def _sbc_rank_plot(
     """Plot simulation-based calibration ranks as empirical CDFs or histograms.
 
     Args:
-        ranks: Tensor of ranks to be plotted shape (num_sbc_runs, num_parameters), or
-            list of Tensors when comparing several sets of ranks, e.g., set of ranks
-            obtained from different methods.
+        ranks: Tensor of ranks to be plotted shape (num_sbc_runs, num_parameters),
+            or (num_sbc_runs,) for a single parameter, or list of Tensors when
+            comparing several sets of ranks, e.g., set of ranks obtained from
+            different methods.
         num_posterior_samples: number of posterior samples used to compute the
             ranks. Ranks must lie in [0, num_posterior_samples].
         num_bins: number of bins used for binning the ranks, default is
@@ -1835,8 +1841,9 @@ def _sbc_rank_plot(
             all in one.
         show_ylabel: whether to show ylabels and ticks.
         sharey: whether to share the y-labels, ticks, and limits across subplots.
-        fig: figure object to plot in.
-        ax: axis object, must contain as many sublpots as parameters or len(ranks).
+        fig: figure object to plot in, defaults to the figure of `ax`.
+        ax: Axes to plot in: a single Axes, or an array with at least as many
+            subplots as parameters when they are plotted in separate subplots.
         figsize: dimensions of figure object, default (8, 5) or (len(ranks) * 4, 5).
 
     Returns:
@@ -1848,11 +1855,14 @@ def _sbc_rank_plot(
         ranks_list = [ranks]
     else:
         assert isinstance(ranks, List)
-        ranks_list = ranks
+        ranks_list = list(ranks)
     for idx, rank in enumerate(ranks_list):
         assert isinstance(rank, (Tensor, np.ndarray))
         # Bin in float64, like the bands: float32 edges can shift a rank by one bin.
-        ranks_list[idx] = ensure_numpy(rank).astype(np.float64)
+        rank_np = ensure_numpy(rank).astype(np.float64)
+        if rank_np.ndim == 1:
+            rank_np = rank_np[:, None]
+        ranks_list[idx] = rank_np
     if not all(((r >= 0) & (r <= num_posterior_samples)).all() for r in ranks_list):
         raise ValueError(
             f"Ranks must lie in [0, num_posterior_samples={num_posterior_samples}]. "
@@ -1904,7 +1914,7 @@ def _sbc_rank_plot(
 
     # Plot one row subplot for each parameter, different "methods" on top of each other.
     if params_in_subplots:
-        if fig is None or ax is None:
+        if ax is None:
             fig, ax = plt.subplots(
                 num_rows,
                 min(num_parameters, num_cols),
@@ -1912,19 +1922,20 @@ def _sbc_rank_plot(
                 sharey=sharey,
             )
             ax = np.atleast_1d(ax)  # type: ignore
+            for unused_ax in ax.flat[num_parameters:]:
+                unused_ax.axis("off")
         else:
+            ax = np.atleast_1d(ax)
             assert ax.size >= num_parameters, (
                 "There must be at least as many subplots as parameters."
             )
-            num_rows = ax.shape[0] if ax.ndim > 1 else 1
+            if fig is None:
+                fig = ax.flat[0].figure
         assert ax is not None
 
-        col_idx, row_idx = 0, 0
         for ii, ranki in enumerate(ranks_list):
             for jj in range(num_parameters):
-                col_idx = jj if num_rows == 1 else jj % num_cols
-                row_idx = jj // num_cols
-                plt.sca(ax[col_idx] if num_rows == 1 else ax[row_idx, col_idx])
+                plt.sca(ax.flat[jj])
 
                 if plot_type in ("cdf", "cdf-diff"):
                     _plot_ranks_as_cdf(
@@ -1972,17 +1983,14 @@ def _sbc_rank_plot(
         if plot_type == "hist" or num_ranks > 1:
             plt.sca(ax.flat[0])
             _sbc_legend(legend_kwargs)
-        # Remove empty subplots.
-        col_idx += 1
-        while num_rows > 1 and col_idx < num_cols:
-            ax[row_idx, col_idx].axis("off")
-            col_idx += 1
 
     # When there is only one set of ranks show all params in a single subplot.
     # Only "cdf" and "cdf-diff" get here: "hist" always uses subplots.
     else:
-        if fig is None or ax is None:
+        if ax is None:
             fig, ax = plt.subplots(1, 1, figsize=figsize)
+        elif fig is None:
+            fig = ax.figure
 
         plt.sca(ax)
         ranki = ranks_list[0]
@@ -2123,8 +2131,9 @@ def _plot_ranks_as_cdf(
         plt.yticks(yticks)
         plt.ylabel(ylabel)
     else:
-        # Plot ticks only
-        plt.yticks(yticks, [])
+        # Plot ticks only; tick_params keeps the labels of axes sharing this y-axis.
+        plt.yticks(yticks)
+        plt.tick_params(axis="y", labelleft=False)
 
     if diff:
         plt.axhline(y=0, color="gray", linestyle="--", alpha=0.5)
