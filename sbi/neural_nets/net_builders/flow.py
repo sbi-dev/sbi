@@ -1260,7 +1260,8 @@ def build_zuko_unconditional_flow(
             - `structured`: treat dimensions as related, therefore compute mean and std
             over the entire batch, instead of per-dimension. Should be used when each
             sample is, for example, a time series or an image.
-        hidden_features: Hidden-layer widths (an int gives two layers). Defaults to 50.
+        hidden_features: Hidden-layer widths (an int gives two layers), ignored by
+            GF, which has no network without a condition. Defaults to 50.
         num_transforms: The number of transformations in the flow. Defaults to 5.
         **kwargs: Additional keyword arguments to pass to the flow constructor.
 
