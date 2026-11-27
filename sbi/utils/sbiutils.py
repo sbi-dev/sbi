@@ -1466,16 +1466,21 @@ def seed_all_backends(seed: Optional[Union[int, Tensor]] = None) -> None:
     torch.backends.cudnn.benchmark = False  # type: ignore
 
 
-def proposal_log_prob(proposal: Any, theta: Tensor) -> Tensor:
+def proposal_log_prob(
+    proposal: Any, theta: Tensor, track_gradients: bool = False
+) -> Tensor:
     """Returns the log-density of `theta` under a proposal of a sampler.
 
     MCMC and rejection posteriors only evaluate the log-probability up to a
-    normalizing constant, their `potential()`. Rejection and importance sampling
-    cancel that constant, so it serves as the proposal's log-density.
+    normalizing constant, their `potential()`, and their `log_prob()` is deprecated.
+    Rejection and importance sampling cancel that constant, so the potential serves
+    as their log-density. A subclass that overrides `log_prob()` keeps it.
 
     Args:
         proposal: Proposal with a `log_prob()`, or an MCMC or rejection posterior.
         theta: Parameters to evaluate.
+        track_gradients: Whether the potential of an MCMC or rejection posterior
+            supports gradients. Other proposals follow `theta`.
 
     Returns:
         Log-density of `theta` under the proposal, up to a constant for MCMC and
@@ -1484,6 +1489,7 @@ def proposal_log_prob(proposal: Any, theta: Tensor) -> Tensor:
     from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
     from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 
-    if isinstance(proposal, (MCMCPosterior, RejectionPosterior)):
-        return proposal.potential(theta)
+    deprecated = (MCMCPosterior.log_prob, RejectionPosterior.log_prob)
+    if getattr(type(proposal), "log_prob", None) in deprecated:
+        return proposal.potential(theta, track_gradients=track_gradients)
     return proposal.log_prob(theta)

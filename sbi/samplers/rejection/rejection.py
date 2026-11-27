@@ -86,7 +86,7 @@ def rejection_sample(
     def potential_over_proposal(theta):
         num_theta = theta.shape[0]
         return potential_fn(theta).reshape(num_theta) - proposal_log_prob(
-            proposal, theta
+            proposal, theta, track_gradients=True
         ).reshape(num_theta)
 
     # Search for the maximum of the ratio.
