@@ -22,6 +22,7 @@ from sbi.utils.conditional_density_utils import (
     compute_corrcoeff,
     extract_and_transform_mog,
 )
+from sbi.utils.sbiutils import log_prob_or_potential
 from sbi.utils.torchutils import (
     atleast_2d_float32_tensor,
     ensure_theta_batched,
@@ -92,7 +93,7 @@ def eval_conditional_density(
         repeated_condition = condition.repeat(resolution, 1)
         repeated_condition[:, dim1] = theta_grid_dim1
 
-        log_probs_on_grid = density.log_prob(repeated_condition)
+        log_probs_on_grid = log_prob_or_potential(density, repeated_condition)
     else:
         repeated_condition = condition.repeat(resolution**2, 1)
         repeated_condition[:, dim1] = theta_grid_dim1.repeat(resolution)
@@ -100,7 +101,7 @@ def eval_conditional_density(
             theta_grid_dim2, resolution
         )
 
-        log_probs_on_grid = density.log_prob(repeated_condition)
+        log_probs_on_grid = log_prob_or_potential(density, repeated_condition)
         log_probs_on_grid = torch.reshape(log_probs_on_grid, (resolution, resolution))
 
     if return_raw_log_prob:
