@@ -1895,9 +1895,7 @@ class VectorFieldConfigBase(_PerModelConfigBase):
         check_data_device(batch_input, batch_condition)
 
         if isinstance(self.net, VectorFieldNetConfigBase):
-            embedded_condition = self.embedding_net.to(batch_condition.device)(
-                batch_condition[:1]
-            )
+            embedded_condition = _probe_module(self.embedding_net, batch_condition[:1])
             vectorfield_net = self.net.build(batch_input, embedded_condition)
         else:
             vectorfield_net = self.net
