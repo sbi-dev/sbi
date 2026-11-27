@@ -894,8 +894,11 @@ class BaseGaussCorrectedScoreFunction(IIDScoreFunction):
         Args:
             vector_field_estimator: The neural network modelling the score.
             prior: The prior distribution.
-            ensure_lam_psd: Whether to ensure the precision matrix is positive definite.
-            lam_psd_nugget: The nugget value to ensure positive definiteness.
+            ensure_lam_psd: Whether to make the combined precision positive definite
+                where it is not, see `ensure_lam_positive_definite`. Positive
+                definite directions stay unchanged.
+            lam_psd_nugget: The nugget added along directions that are not positive
+                definite, relative to the largest posterior precision.
             device: The device on which to evaluate the potential. Defaults to "cpu".
         """
         super().__init__(vector_field_estimator, prior, device)
@@ -1114,8 +1117,11 @@ class GaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
             posterior_precision: Optional preset posterior precision.
             scale_from_prior_precision: Factor to scale the prior precision by when
                 ``posterior_precision`` is not provided.
-            enable_lam_psd: Whether to ensure the precision matrix is positive definite.
-            lam_psd_nugget: The nugget value to ensure positive definiteness.
+            enable_lam_psd: Whether to make the combined precision positive definite
+                where it is not, see `ensure_lam_positive_definite`. Positive
+                definite directions stay unchanged.
+            lam_psd_nugget: The nugget added along directions that are not positive
+                definite, relative to the largest posterior precision.
             device: The device on which to evaluate the potential. Defaults to "cpu".
         """
         super().__init__(
@@ -1216,8 +1222,11 @@ class AutoGaussCorrectedScoreFn(BaseGaussCorrectedScoreFunction):
         Args:
             vector_field_estimator: The neural network modeling the score.
             prior: The prior distribution.
-            enable_lam_psd: Whether to ensure the precision matrix is positive definite.
-            lam_psd_nugget: The nugget value to ensure positive definiteness.
+            enable_lam_psd: Whether to make the combined precision positive definite
+                where it is not, see `ensure_lam_positive_definite`. Positive
+                definite directions stay unchanged.
+            lam_psd_nugget: The nugget added along directions that are not positive
+                definite, relative to the largest posterior precision.
             precision_est_only_diag: Whether to estimate only the diagonal of the
                 precision matrix.
             precision_est_budget: The budget for the precision estimation.
@@ -1433,66 +1442,63 @@ def ensure_lam_positive_definite(
     precision_nugget: float = 0.1,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     r"""
-    Ensure that the matrix is positive definite.
+    Make the combined precision `Lam` positive definite where it is not.
+
+    `Lam` is the sum of the posterior precisions minus `N - 1` prior precisions.
+    Along each eigenvector of `Lam` (each entry of a diagonal `Lam`) whose eigenvalue
+    is not positive, every posterior precision gets the eigenvalue's magnitude divided
+    by `N - 1`, plus a nugget. Positive definite directions stay unchanged, so exact
+    precisions give exact scores.
 
     Args:
         denoising_prior_precision: The prior precision tensor.
         denoising_posterior_precision: The posterior precision tensor.
-        N: The scaling factor used in the correction.
-        precision_nugget: The nugget value to ensure positive definiteness. For a
-            dense `Lam`, the total nugget is at least 100 machine epsilons times
-            the largest absolute eigenvalue of `Lam`, and the nugget per trial is
-            at least one machine epsilon times the largest posterior precision.
-            For a diagonal `Lam`, both bounds hold per diagonal entry.
+        N: The number of observations.
+        precision_nugget: The nugget per observation, relative to the largest
+            posterior precision, so that it does not depend on the scale of the
+            parameters. It is at least 100 machine epsilons times the largest
+            absolute eigenvalue of `Lam`, divided by `N`. For a diagonal `Lam`, both
+            scales are taken per diagonal entry.
 
     Returns:
         A tuple of (denoising_prior_precision, denoising_posterior_precision) where the
-        posterior precision has been adjusted to be positive definite.
+        posterior precision has been adjusted so that `Lam` is positive definite.
     """
     d = denoising_prior_precision.shape[-1]
 
     term1 = (1 - N) * denoising_prior_precision
     term2 = torch.sum(denoising_posterior_precision, axis=1, keepdim=True)  # type: ignore
     Lam = add_diag_or_dense(term1, term2, batch_dims=2)
+    eps = torch.finfo(Lam.dtype).eps
 
-    is_diag = Lam.ndim == 3
-    if d > 1 and not is_diag:
+    dense = d > 1 and Lam.ndim == 4
+    if dense:
         eigenvalues, eigenvectors = torch.linalg.eigh(Lam)
-        corrected_eigs = torch.where(
-            eigenvalues <= 0, -eigenvalues, torch.zeros_like(eigenvalues)
-        )
-        corrected_eigs = corrected_eigs / (N - 1)
-
-        Lam_corr = torch.einsum(
-            '...ij,...j,...kj->...ik', eigenvectors, corrected_eigs, eigenvectors
-        )
-        # The nugget must survive rounding in `Lam` and in each posterior precision.
-        eps = torch.finfo(Lam.dtype).eps
-        nugget = torch.maximum(
-            100 * eps * eigenvalues.abs().amax(-1) / N,
-            eps * denoising_posterior_precision.flatten(1).abs().amax(-1)[..., None],
-        )
-        nugget = torch.clamp(nugget, min=precision_nugget)[..., None, None]
-        Lam_corr += nugget * torch.eye(
-            Lam.shape[-1], device=Lam.device, dtype=Lam.dtype
-        )
-
-        denoising_posterior_precision = add_diag_or_dense(
-            denoising_posterior_precision, Lam_corr, batch_dims=2
-        )
+        eigenvalue_scale = eigenvalues.abs().amax(-1, keepdim=True)
+        posterior_scale = denoising_posterior_precision.flatten(1).abs().amax(-1)
+        posterior_scale = posterior_scale.reshape(-1, 1, 1)
     else:
         # A diagonal Lam, or a 1 x 1 one, is corrected elementwise; the precisions may
         # mix diagonal and dense layouts.
-        eps = torch.finfo(Lam.dtype).eps
-        max_posterior_precision = denoising_posterior_precision.abs().amax(1, True)
-        if max_posterior_precision.ndim < Lam.ndim:  # diagonal next to a dense 1 x 1
-            max_posterior_precision = max_posterior_precision.unsqueeze(-1)
-        nugget = torch.maximum(
-            100 * eps * Lam.abs() / N, eps * max_posterior_precision
-        ).clamp(min=precision_nugget)
-        Lam_corr = torch.where(Lam > 0, torch.zeros_like(Lam), -Lam) / (N - 1) + nugget
-        denoising_posterior_precision = add_diag_or_dense(
-            denoising_posterior_precision, Lam_corr, batch_dims=2
+        eigenvalues = Lam
+        eigenvalue_scale = Lam.abs()
+        posterior_scale = denoising_posterior_precision.abs().amax(1, True)
+        if posterior_scale.ndim < Lam.ndim:  # diagonal next to a dense 1 x 1
+            posterior_scale = posterior_scale.unsqueeze(-1)
+    # Eigenvalues within rounding of zero count as not positive.
+    tolerance = 100 * eps * torch.maximum(eigenvalue_scale, posterior_scale)
+    nugget = torch.maximum(max(precision_nugget, eps) * posterior_scale, tolerance / N)
+    correction = torch.where(
+        eigenvalues <= tolerance,
+        eigenvalues.abs() / (N - 1) + nugget.clamp(min=eps),
+        torch.zeros_like(eigenvalues),
+    )
+    if dense:
+        correction = torch.einsum(
+            '...ij,...j,...kj->...ik', eigenvectors, correction, eigenvectors
         )
+    denoising_posterior_precision = add_diag_or_dense(
+        denoising_posterior_precision, correction, batch_dims=2
+    )
 
     return denoising_prior_precision, denoising_posterior_precision

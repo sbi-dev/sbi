@@ -237,9 +237,7 @@ def test_prior_guide_score_is_exact_for_gaussians(estimator_type, num_observatio
         precision = torch.full((1, 1), 4.0)
         estimator = CombinedIIDScore(
             estimator,
-            GaussCorrectedScoreFn(
-                estimator, prior, posterior_precision=precision, enable_lam_psd=False
-            ),
+            GaussCorrectedScoreFn(estimator, prior, posterior_precision=precision),
         )
     guidance = PriorGuide(
         estimator,
@@ -539,10 +537,9 @@ def test_iid_score_is_exact_for_linear_gaussian(sde_type, iid_method):
             estimator,
             prior,
             posterior_precision=torch.inverse(posterior_cov),
-            enable_lam_psd=False,
         )
     else:
-        score_fn = JacCorrectedScoreFn(estimator, prior, ensure_lam_psd=False)
+        score_fn = JacCorrectedScoreFn(estimator, prior)
 
     posterior = true_posterior_linear_gaussian_mvn_prior(
         x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
