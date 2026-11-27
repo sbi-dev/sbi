@@ -14,20 +14,11 @@ class BinomialGammaPotential(BasePotential):
     def __init__(
         self,
         prior: Distribution,
-        x_o: Tensor,
         concentration_scaling: Union[Tensor, float] = 1.0,
         device="cpu",
     ):
-        super().__init__(prior, x_o, device)
-
-        # concentration_scaling needs to be a float or match the batch size
-        if isinstance(concentration_scaling, Tensor):
-            num_trials = x_o.shape[0]
-            assert concentration_scaling.shape[0] == num_trials
-
-            # Reshape to match convention (batch_size, num_trials, *event_shape)
-            concentration_scaling = concentration_scaling.reshape(1, num_trials, -1)
-
+        super().__init__(prior, device=device)
+        # A float, or one value per trial of the bound `x_o`.
         self.concentration_scaling = concentration_scaling
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
@@ -41,6 +32,11 @@ class BinomialGammaPotential(BasePotential):
     def iid_likelihood(self, theta: Tensor) -> Tensor:
         batch_size = theta.shape[0]
         num_trials = self.x_o.shape[0]
+        concentration_scaling = self.concentration_scaling
+        if isinstance(concentration_scaling, Tensor):
+            assert concentration_scaling.shape[0] == num_trials
+            # Match the convention (batch_size, num_trials, *event_shape).
+            concentration_scaling = concentration_scaling.reshape(1, num_trials, -1)
         theta = theta.reshape(batch_size, 1, -1)
         # We assume the InverseGamma to be in the first position of theta.
         # And potentially multiple Binomials in the rest.
@@ -61,7 +57,7 @@ class BinomialGammaPotential(BasePotential):
         )
 
         logprob_rts = InverseGamma(
-            concentration=self.concentration_scaling * torch.ones_like(beta), rate=beta
+            concentration=concentration_scaling * torch.ones_like(beta), rate=beta
         ).log_prob(self.x_o[:, :1].reshape(1, num_trials, -1))
 
         # sum across parameter dimensions.

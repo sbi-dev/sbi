@@ -373,7 +373,6 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
         potential_fn, theta_transform = likelihood_estimator_based_potential(
             likelihood_estimator=estimator,
             prior=prior,
-            x_o=None,
         )
         return potential_fn, theta_transform
 

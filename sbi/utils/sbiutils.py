@@ -2,8 +2,10 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import logging
+import os
 import random
 import warnings
+from inspect import currentframe
 from math import pi
 from pathlib import Path
 from typing import (
@@ -42,6 +44,35 @@ from sbi.utils.torchutils import unwrap_mixture_support
 
 _T = TypeVar("_T")
 logger = logging.getLogger(__name__)
+
+
+_SBI_ROOT = str(Path(__file__).parents[1]) + os.sep
+
+
+def _stacklevel_to_caller(default: int = 2) -> int:
+    """Return the `warnings.warn` stacklevel of the first frame outside sbi.
+
+    Callers reach the warning through a different number of internal frames each
+    (trainers, potential subclasses), so no constant is right for all of them. A
+    constant also makes Python's "once per location" filter collapse every call in a
+    process into one warning. (`warn(skip_file_prefixes=...)` would do this, but
+    needs Python 3.12.)
+
+    Args:
+        default: Stacklevel to fall back to if every frame is inside sbi.
+
+    Returns:
+        Stacklevel that attributes the warning to the caller's own code.
+    """
+    frame = currentframe()
+    frame = frame.f_back if frame is not None else None
+    level = 1
+    while frame is not None:
+        if not frame.f_code.co_filename.startswith(_SBI_ROOT):
+            return level
+        frame = frame.f_back
+        level += 1
+    return default
 
 
 def save_with_version(obj: Any, filename: Union[str, Path]) -> None:

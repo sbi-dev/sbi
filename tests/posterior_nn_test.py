@@ -270,11 +270,11 @@ def test_importance_posterior_uses_constructor_sampling_arguments(monkeypatch):
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
     theta = prior.sample((10,))
     potential_fn, _ = posterior_estimator_based_potential(
-        posterior_nn("mdn")(theta, theta), prior, x_o=ones(1, num_dim)
+        posterior_nn("mdn")(theta, theta), prior
     )
     posterior = ImportanceSamplingPosterior(
         potential_fn, proposal=prior, oversampling_factor=5, max_sampling_batch_size=40
-    )
+    ).set_default_x(ones(1, num_dim))
     calls = _spy_on_sampler(
         monkeypatch,
         "sbi.inference.posteriors.importance_posterior.sampling_importance_resampling",
@@ -823,9 +823,7 @@ def test_posterior_based_potential_iid_log_prob(iid_batch_size: int):
         x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
     )
 
-    potential_fn, _ = posterior_estimator_based_potential(
-        posterior_estimator, prior, x_o=None
-    )
+    potential_fn, _ = posterior_estimator_based_potential(posterior_estimator, prior)
     potential_fn = potential_fn.bind(x_o, x_is_iid=True)
 
     posterior_samples = true_posterior.sample((num_posterior_samples,))

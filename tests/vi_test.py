@@ -159,7 +159,6 @@ def _build_linear_gaussian_setup(trainer_type: str = "nle"):
         potential_fn, _ = likelihood_estimator_based_potential(
             likelihood_estimator=estimator,
             prior=prior,
-            x_o=None,
         )
     elif trainer_type == "nre":
         trainer = NRE(prior=prior, show_progress_bars=False, classifier="mlp")
@@ -168,7 +167,6 @@ def _build_linear_gaussian_setup(trainer_type: str = "nle"):
         potential_fn, _ = ratio_estimator_based_potential(
             ratio_estimator=estimator,
             prior=prior,
-            x_o=None,
         )
     else:
         raise ValueError(f"Unknown trainer_type: {trainer_type}")
@@ -1272,7 +1270,7 @@ def test_vi_with_multiple_independent_prior():
 
     trainer = NLE(prior)
     nle = trainer.append_simulations(theta, x).train()
-    potential, transform = likelihood_estimator_based_potential(nle, prior, x[0])
+    potential, transform = likelihood_estimator_based_potential(nle, prior)
     posterior = VIPosterior(
         potential,
         prior=prior,

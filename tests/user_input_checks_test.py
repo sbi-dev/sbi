@@ -437,11 +437,12 @@ def test_posterior_rejects_nonfinite_x(trained_npe):
 
 
 def test_nonfinite_x_on_preconditioned_potential(trained_npe):
-    """`x_o` passed to the potential builder (#573) must be checked too."""
+    """`x_o` of a bound potential (deprecated default `x`) must be checked too."""
     prior, _, estimator = trained_npe
     potential_fn, theta_transform = posterior_estimator_based_potential(
-        estimator, prior, x_o=torch.tensor([[0.0, float("nan")]])
+        estimator, prior
     )
+    potential_fn = potential_fn.bind(torch.tensor([[0.0, float("nan")]]))
 
     with pytest.raises(ValueError, match="NaN/Inf"):
         MCMCPosterior(potential_fn, theta_transform=theta_transform, proposal=prior)
@@ -575,13 +576,12 @@ def test_ensemble_derives_nan_tolerance_from_components(trained_nan_tolerant_npe
 def test_conditioned_potential_preserves_nan_tolerance(trained_nan_tolerant_npe):
     """`conditional_potential()` over a NaN-tolerant potential must stay tolerant.
 
-    Constructing the posterior runs the `x_o` guard on the NaN-padded
-    observation carried by the conditioned potential.
+    Setting the default `x` runs the `x_o` guard on the NaN-padded observation.
     """
     prior, inference, x_nan = trained_nan_tolerant_npe
     estimator = inference.build_posterior().posterior_estimator
     potential_fn, theta_transform = posterior_estimator_based_potential(
-        estimator, prior, x_o=x_nan
+        estimator, prior
     )
     conditioned_potential_fn, restricted_tf, restricted_prior = conditional_potential(
         potential_fn,
@@ -595,7 +595,7 @@ def test_conditioned_potential_preserves_nan_tolerance(trained_nan_tolerant_npe)
         conditioned_potential_fn,
         theta_transform=restricted_tf,
         proposal=restricted_prior,
-    )
+    ).set_default_x(x_nan)
 
 
 def test_mnpe_derives_nan_tolerance_from_marked_embedding():
@@ -636,7 +636,7 @@ def test_nan_tolerance_derived_for_ratio_and_categorical(estimator_type):
         estimator = classifier_nn(model="mlp", embedding_net_x=NaNTolerantEmbedding())(
             prior.sample((100,)), x
         )
-        potential_fn, _ = ratio_estimator_based_potential(estimator, prior, x_o=None)
+        potential_fn, _ = ratio_estimator_based_potential(estimator, prior)
         posterior = MCMCPosterior(potential_fn=potential_fn, proposal=prior)
     else:
         prior = BoxUniform(zeros(1), 2 * ones(1))

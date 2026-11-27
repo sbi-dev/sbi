@@ -117,14 +117,14 @@ def test_c2st_nle_on_linear_gaussian_different_dims(
 
     likelihood_estimator = inference.append_simulations(theta, x).train()
     potential_fn, theta_transform = likelihood_estimator_based_potential(
-        prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
+        prior=prior, likelihood_estimator=likelihood_estimator
     )
     posterior = MCMCPosterior(
         proposal=prior,
         potential_fn=potential_fn,
         theta_transform=theta_transform,
         **asdict(mcmc_params_accurate),
-    )
+    ).set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
@@ -195,14 +195,14 @@ def test_c2st_and_map_nle_on_linearGaussian_different(
             raise ValueError(f"Wrong prior_str: '{prior_str}'.")
 
         potential_fn, theta_transform = likelihood_estimator_based_potential(
-            prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
+            prior=prior, likelihood_estimator=likelihood_estimator
         )
         posterior = MCMCPosterior(
             proposal=prior,
             potential_fn=potential_fn,
             theta_transform=theta_transform,
             **asdict(mcmc_params_accurate),
-        )
+        ).set_default_x(x_o)
 
         samples = posterior.sample(sample_shape=(num_samples,))
 
@@ -253,15 +253,13 @@ def test_map_with_multiple_independent_prior(use_transform):
     likelihood_estimator = trainer.train(max_num_epochs=5)
 
     potential_fn, parameter_transform = likelihood_estimator_based_potential(
-        likelihood_estimator,
-        prior,
-        x_o=x_o,
+        likelihood_estimator, prior
     )
     posterior = MCMCPosterior(
         potential_fn,
         proposal=prior,
         theta_transform=parameter_transform if use_transform else None,
-    )
+    ).set_default_x(x_o)
     posterior.map()
     posterior.set_default_x(x_o).map(num_iter=10)
 
@@ -300,28 +298,28 @@ def test_c2st_multi_round_nle_on_linearGaussian(
 
     likelihood_estimator = inference.append_simulations(theta, x).train()
     potential_fn, theta_transform = likelihood_estimator_based_potential(
-        prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
+        prior=prior, likelihood_estimator=likelihood_estimator
     )
     posterior1 = MCMCPosterior(
         proposal=prior,
         potential_fn=potential_fn,
         theta_transform=theta_transform,
         **asdict(mcmc_params_accurate),
-    )
+    ).set_default_x(x_o)
 
     theta = posterior1.sample((num_simulations_per_round,))
     x = simulator(theta)
 
     likelihood_estimator = inference.append_simulations(theta, x).train()
     potential_fn, theta_transform = likelihood_estimator_based_potential(
-        prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
+        prior=prior, likelihood_estimator=likelihood_estimator
     )
     posterior = MCMCPosterior(
         proposal=prior,
         potential_fn=potential_fn,
         theta_transform=theta_transform,
         **asdict(mcmc_params_accurate),
-    )
+    ).set_default_x(x_o)
 
     samples = posterior.sample(sample_shape=(num_samples,))
 
@@ -361,12 +359,12 @@ def test_c2st_multi_round_nle_on_linearGaussian_vi(num_trials: int):
 
     likelihood_estimator = inference.append_simulations(theta, x).train()
     potential_fn, theta_transform = likelihood_estimator_based_potential(
-        prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
+        prior=prior, likelihood_estimator=likelihood_estimator
     )
     posterior1 = VIPosterior(
         potential_fn=potential_fn,
         theta_transform=theta_transform,
-    )
+    ).set_default_x(x_o)
     posterior1.train()
 
     theta = posterior1.sample((num_simulations_per_round,))
@@ -374,11 +372,11 @@ def test_c2st_multi_round_nle_on_linearGaussian_vi(num_trials: int):
 
     likelihood_estimator = inference.append_simulations(theta, x).train()
     potential_fn, theta_transform = likelihood_estimator_based_potential(
-        prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
+        prior=prior, likelihood_estimator=likelihood_estimator
     )
     posterior = VIPosterior(
         potential_fn=potential_fn, theta_transform=theta_transform, q=posterior1
-    )
+    ).set_default_x(x_o)
     posterior.train(eps=1e-7)
 
     samples = posterior.sample(sample_shape=(num_samples,))
@@ -460,10 +458,12 @@ def test_api_nle_sampling_methods(
         max_num_epochs=5
     )
     potential_fn, theta_transform = likelihood_estimator_based_potential(
-        prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
+        prior=prior, likelihood_estimator=likelihood_estimator
     )
     if sample_with == "rejection":
-        posterior = RejectionPosterior(potential_fn=potential_fn, proposal=prior)
+        posterior = RejectionPosterior(
+            potential_fn=potential_fn, proposal=prior
+        ).set_default_x(x_o)
     elif (
         "slice" in sampling_method
         or "nuts" in sampling_method
@@ -477,19 +477,19 @@ def test_api_nle_sampling_methods(
             proposal=prior,
             theta_transform=theta_transform,
             **asdict(mcmc_params_fast),
-        )
+        ).set_default_x(x_o)
     elif sample_with == "importance":
         posterior = ImportanceSamplingPosterior(
             potential_fn,
             proposal=prior,
             theta_transform=theta_transform,
-        )
+        ).set_default_x(x_o)
     else:
         posterior = VIPosterior(
             potential_fn,
             theta_transform=theta_transform,
             vi_method=sampling_method,
-        )
+        ).set_default_x(x_o)
         posterior.train(max_num_iters=10)
 
     posterior.sample(sample_shape=(num_samples,), show_progress_bars=False)
@@ -562,14 +562,14 @@ def test_c2st_nle_unconstrained_space(
         )
 
     potential_fn, theta_transform = likelihood_estimator_based_potential(
-        prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
+        prior=prior, likelihood_estimator=likelihood_estimator
     )
     posterior = MCMCPosterior(
         proposal=prior,
         potential_fn=potential_fn,
         theta_transform=theta_transform,
         **asdict(mcmc_params_accurate),
-    )
+    ).set_default_x(x_o)
 
     samples = posterior.sample(sample_shape=(num_samples,))
 

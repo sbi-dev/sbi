@@ -19,6 +19,7 @@ from sbi.inference.potentials.base_potential import (
 from sbi.sbi_types import Array, Shape, TorchTransform
 from sbi.utils.sbiutils import (
     _apply_to_transform,
+    _stacklevel_to_caller,
     gradient_ascent,
     load_with_version,
     nan_tolerant_input_net,
@@ -45,6 +46,9 @@ class NeuralPosterior:
     such that one can directly evaluate the (unnormalized) log probability and draw
     samples from the posterior.
     """
+
+    # Deprecated, removed in sbi 0.29: the default `x` was taken from a bound potential.
+    _x_from_potential = False
 
     def __init__(
         self,
@@ -74,7 +78,7 @@ class NeuralPosterior:
         if not isinstance(potential_fn, BasePotential):
             potential_device = "cpu" if device is None else device
             potential_fn = CustomPotentialWrapper(
-                potential_fn, prior=None, x_o=None, device=potential_device
+                potential_fn, prior=None, device=potential_device
             )
 
         self._device = process_device(potential_fn.device if device is None else device)
@@ -92,13 +96,11 @@ class NeuralPosterior:
         self._leakage_cache: Optional[Tuple[Tensor, int, Tensor]] = None
         self._purpose = ""
 
-        # If the sampler interface (#573) is used, the user might have passed `x_o`
-        # already to the potential function builder. If so, this `x_o` will be used
-        # as default x.
         x_o = self.potential_fn.return_x_o()
         if x_o is not None:
             self._assert_finite_x(x_o)
         self._x = x_o
+        self._x_from_potential = x_o is not None
 
     def _assert_finite_x(self, x: Tensor) -> None:
         """Raise if `x` contains Inf, or NaN that the net embedding `x` does not
@@ -227,6 +229,15 @@ class NeuralPosterior:
     @property
     def default_x(self) -> Optional[Tensor]:
         """Return default x used by `.sample(), .log_prob` as conditioning context."""
+        if self._x_from_potential:
+            warn(
+                "This posterior uses the `x` bound to its potential as its default "
+                "`x`, since none was set. That `x` comes from your `bind()` or from "
+                "the last call of the posterior the potential came from. sbi 0.29 "
+                "stops this: call `set_default_x(x)` or pass `x` to `sample()`.",
+                FutureWarning,
+                stacklevel=_stacklevel_to_caller(),
+            )
         return self._x
 
     @default_x.setter
@@ -240,7 +251,8 @@ class NeuralPosterior:
         Reset the MAP stored for the old default x if applicable.
 
         This is a pure convenience to avoid having to repeatedly specify `x` in calls to
-        `.sample()` and `.log_prob()` - only $\theta$ needs to be passed.
+        `.sample()` and `.log_prob()` - only $\theta$ needs to be passed. The posterior
+        binds its potential to this `x` (with `potential_fn.bind()`) at each call.
 
         This convenience is particularly useful when the posterior is focused, i.e.
         has been trained over multiple rounds to be accurate in the vicinity of a
@@ -261,6 +273,7 @@ class NeuralPosterior:
             `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
         self._x = self._process_x(x)
+        self._x_from_potential = False
         self._map = None
         return self
 

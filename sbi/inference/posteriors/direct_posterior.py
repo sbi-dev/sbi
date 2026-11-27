@@ -91,7 +91,6 @@ class DirectPosterior(NeuralPosterior):
         potential_fn, theta_transform = posterior_estimator_based_potential(
             posterior_estimator,
             prior,
-            x_o=None,
             enable_transform=enable_transform,
         )
 

@@ -28,9 +28,7 @@ def toy():
 
 
 def _likelihood_potential(prior, theta, x):
-    return likelihood_estimator_based_potential(
-        likelihood_nn("mdn")(theta, x), prior, None
-    )
+    return likelihood_estimator_based_potential(likelihood_nn("mdn")(theta, x), prior)
 
 
 def _untrained_posterior(kind, prior, theta, x):

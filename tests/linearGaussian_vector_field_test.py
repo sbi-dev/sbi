@@ -758,7 +758,7 @@ def test_sample_conditional():
     # Evaluate the conditional density be drawing samples and smoothing with a Gaussian
     # kde.
     potential_fn, theta_transform = vector_field_estimator_based_potential(
-        posterior_estimator, prior=prior, x_o=x_o
+        posterior_estimator, prior=prior
     )
     (
         conditioned_potential_fn,

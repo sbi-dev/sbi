@@ -16,7 +16,6 @@ from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from sbi.inference.trainers.base import _stacklevel_to_caller
 from sbi.neural_nets.estimators import UnconditionalDensityEstimator
 from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
@@ -32,6 +31,7 @@ from sbi.neural_nets.net_builders.estimator_configs import (
 from sbi.sbi_types import Tracker
 from sbi.utils import check_estimator_arg, get_log_root
 from sbi.utils.pbar import end_progress_line, print_progress
+from sbi.utils.sbiutils import _stacklevel_to_caller
 from sbi.utils.torchutils import assert_all_finite, process_device
 from sbi.utils.tracking import TensorBoardTracker
 

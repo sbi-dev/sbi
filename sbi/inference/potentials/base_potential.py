@@ -2,37 +2,61 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import copy
+import warnings
 from abc import ABCMeta, abstractmethod
-from typing import Optional, Protocol, Self, Union
+from enum import Enum
+from typing import Literal, Optional, Protocol, Self, Union
 
 import torch
 from torch import Tensor, nn
 from torch.distributions import Distribution
 
+from sbi.utils.sbiutils import _stacklevel_to_caller
 from sbi.utils.torchutils import process_device
 from sbi.utils.user_input_checks import maybe_wrap_batched_1d_prior, process_x
 from sbi.utils.user_input_checks_utils import move_distribution_to_device
+
+
+class _Unset(Enum):
+    """Default of the deprecated `x_o` argument, so that an explicit `None` warns."""
+
+    UNSET = "UNSET"
+
+
+_UNSET = _Unset.UNSET
+_DeprecatedXo = Union[Tensor, None, Literal[_Unset.UNSET]]
 
 
 class BasePotential(metaclass=ABCMeta):
     def __init__(
         self,
         prior: Optional[Distribution],
-        x_o: Optional[Tensor] = None,
+        x_o: _DeprecatedXo = _UNSET,
         device: Union[str, torch.device] = "cpu",
     ):
         """Initialize potential function.
 
-        This parent class takes care of setting `x_o`.
-
         Args:
             prior: Prior distribution. A 1-D prior with batch shape (1,) is stored as
                 `Independent(prior, 1)`, so that its log prob has one value per sample.
-            x_o: Observed data.
+            x_o: Deprecated, will be removed in sbi 0.29. Use `bind(x_o)` instead.
             device: Device on which to evaluate the potential function.
         """
         self.device = process_device(device)
         self.prior = maybe_wrap_batched_1d_prior(prior)
+        if x_o is _UNSET:
+            x_o = None
+        else:
+            # Also for `None`: once `x_o` is removed, a positional `None` would shift
+            # into the next argument.
+            warnings.warn(
+                "Passing `x_o` to a potential's constructor is deprecated and will be "
+                "removed in sbi 0.29. Build the potential without `x_o`, passing the "
+                "arguments after `prior` by keyword, and call `potential.bind(x_o)`, "
+                "which returns the bound potential.",
+                FutureWarning,
+                stacklevel=_stacklevel_to_caller(),
+            )
         self._x_o = self._prepare_x_o(x_o)
         self._x_is_iid = True
 
@@ -107,10 +131,8 @@ class BasePotential(metaclass=ABCMeta):
 
         DEPRECATED: Use bind() instead. This method delegates to bind() internally.
         """
-        import warnings
-
         warnings.warn(
-            "set_x() is deprecated, use bind() instead",
+            "`set_x()` is deprecated and will be removed in sbi 0.29. Use `bind()`.",
             FutureWarning,
             stacklevel=2,
         )
@@ -130,6 +152,10 @@ class BasePotential(metaclass=ABCMeta):
 
     def bind(self, x_o: Optional[Tensor], x_is_iid: bool = True) -> "BasePotential":
         """Create new potential with x bound, without mutable state.
+
+        Use it when you evaluate a potential yourself or pass it to your own
+        sampler. A posterior binds its potential itself: give it `x` with
+        `sample(x=...)` or `set_default_x()`.
 
         `bind()` does not modify the original potential. A reference to the
         original keeps the old state; always use the returned potential.
@@ -207,7 +233,7 @@ class CustomPotentialWrapper(BasePotential):
         self,
         potential_fn: CustomPotential,  # type: ignore
         prior: Optional[Distribution],  # type: ignore
-        x_o: Optional[Tensor] = None,
+        x_o: _DeprecatedXo = _UNSET,
         device: Union[str, torch.device] = "cpu",
     ):
         """Wraps a callable potential function.
@@ -217,7 +243,7 @@ class CustomPotentialWrapper(BasePotential):
                 protocol, i.e., the function must have exactly two positional arguments
                 where the first is theta and the second is the x_o.
             prior: Prior distribution, optional at init, but needed at inference time.
-            x_o: Observed data, optional at init, but needed at inference time.
+            x_o: Deprecated, will be removed in sbi 0.29. Use `bind(x_o)` instead.
             device: Device on which to evaluate the potential function.
 
         """
@@ -240,20 +266,7 @@ class CustomPotentialWrapper(BasePotential):
     def __call__(self, theta, track_gradients: bool = True):
         """Calls the custom potential function on given theta.
 
-        Note, x_o is re-used from the initialization of the potential function.
+        Note, x_o is the observation bound with `bind()`.
         """
         with torch.set_grad_enabled(track_gradients):
             return self.potential_fn(theta, self.x_o)
-
-    def bind(
-        self, x_o: Optional[Tensor], x_is_iid: bool = True
-    ) -> "CustomPotentialWrapper":
-        """Create new potential with x bound, without mutable state."""
-        bound = CustomPotentialWrapper(
-            potential_fn=self.potential_fn,
-            prior=self.prior,
-            x_o=x_o,
-            device=self.device,
-        )
-        bound._x_is_iid = x_is_iid
-        return bound

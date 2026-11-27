@@ -363,7 +363,6 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
         potential_fn, theta_transform = posterior_estimator_based_potential(
             posterior_estimator=estimator,
             prior=prior,
-            x_o=None,
         )
         return potential_fn, theta_transform
 

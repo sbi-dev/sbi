@@ -209,11 +209,11 @@ def test_training_and_mcmc_on_device(
             # build potential for NLE or NRE and construct ImportanceSamplingPosterior
             if method == NLE:
                 potential_fn, theta_transform = likelihood_estimator_based_potential(
-                    estimator, prior, x_o
+                    estimator, prior
                 )
             elif method in [NRE_A, NRE_B, NRE_C]:
                 potential_fn, theta_transform = ratio_estimator_based_potential(
-                    estimator, prior, x_o
+                    estimator, prior
                 )
             else:
                 raise ValueError()
@@ -661,9 +661,7 @@ def test_conditioned_posterior_on_gpu(
     )
 
     potential_fn, prior_transform = likelihood_estimator_based_potential(
-        estimator,
-        proposal,
-        x_o.to(inference_device),
+        estimator, proposal
     )
     conditioned_potential_fn = potential_fn.condition_on_theta(
         condition_o, dims_global_theta=[0, 1]

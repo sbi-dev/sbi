@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import pickle
+import warnings
 from dataclasses import asdict
 
 import pytest
@@ -193,15 +194,15 @@ def test_conditioned_potential(condition: Tensor):
     ConditionedPotential(potential_fn, condition=condition, dims_to_sample=[0])
 
 
-def _build_potential(potential_type: str, x_o: Tensor | None = None) -> BasePotential:
+def _build_potential(potential_type: str, **kwargs) -> BasePotential:
     """Build a small untrained potential of the given type."""
     prior = BoxUniform(zeros(2), ones(2))
     theta = prior.sample((20,))
     x = torch.randn(20, 2)
 
     if potential_type == "posterior":
-        return PosteriorBasedPotential(posterior_nn("mdn")(theta, x), prior, x_o=x_o)
-    return VectorFieldBasedPotential(posterior_score_nn()(theta, x), prior, x_o=x_o)
+        return PosteriorBasedPotential(posterior_nn("mdn")(theta, x), prior, **kwargs)
+    return VectorFieldBasedPotential(posterior_score_nn()(theta, x), prior, **kwargs)
 
 
 def test_potential_with_1d_prior_gives_one_value_per_theta():
@@ -215,8 +216,9 @@ def test_potential_with_1d_prior_gives_one_value_per_theta():
     independent_prior = Independent(Normal(zeros(1), ones(1)), 1)
 
     estimator = likelihood_nn("mdn")(theta, x)
-    potential = LikelihoodBasedPotential(estimator, prior, x_o=zeros(1, 2))
-    reference = LikelihoodBasedPotential(estimator, independent_prior, x_o=zeros(1, 2))
+    x_o = zeros(1, 2)
+    potential = LikelihoodBasedPotential(estimator, prior).bind(x_o)
+    reference = LikelihoodBasedPotential(estimator, independent_prior).bind(x_o)
 
     test_theta = torch.randn(3, 1)
     values = potential(test_theta)
@@ -276,13 +278,23 @@ def test_vector_field_potential_marginalizes_1d_prior_exactly():
     assert torch.allclose(marginalize(potential.prior, m, s).log_prob(t), exact)
 
 
-@pytest.mark.parametrize("potential_type", ("posterior", "vector_field"))
-def test_potential_with_x_o_at_construction(potential_type: str):
-    """Test that x_o passed to the constructor behaves like a later bind()."""
-    potential = _build_potential(potential_type, x_o=zeros(1, 2))
+def test_x_o_at_construction_warns_and_binds():
+    """Test that deprecated constructor x_o warns and behaves like a later bind()."""
+    with pytest.warns(FutureWarning, match="Passing `x_o`"):
+        potential = _build_potential("posterior", x_o=zeros(1, 2))
 
     assert potential.x_is_iid is False
     assert torch.isfinite(potential(zeros(1, 2))).all()
+
+
+def test_factory_x_o_warns_also_when_none():
+    """An explicit `x_o=None` warns too: it would shift once `x_o` is removed."""
+    prior = BoxUniform(zeros(2), ones(2))
+    net = posterior_nn("mdn")(prior.sample((20,)), torch.randn(20, 2))
+
+    with pytest.warns(FutureWarning, match="Passing `x_o`"):
+        potential_fn, _ = posterior_estimator_based_potential(net, prior, None)
+    assert potential_fn.return_x_o() is None
 
 
 def test_base_bind_default_for_custom_potentials():
@@ -323,7 +335,6 @@ def test_ensemble_bind_and_construction_respect_components():
         potential_fns=components,
         weights=torch.tensor([0.5, 0.5]),
         prior=prior,
-        x_o=None,
     )
 
     bound = ensemble.bind(zeros(1, 2))
@@ -332,14 +343,28 @@ def test_ensemble_bind_and_construction_respect_components():
     bound_iid = ensemble.bind(zeros(1, 2), x_is_iid=True)
     assert all(p.x_is_iid is True for p in bound_iid.potential_fns)
 
-    constructed = EnsemblePotential(
-        potential_fns=components,
-        weights=torch.tensor([0.5, 0.5]),
-        prior=prior,
-        x_o=zeros(1, 2),
-    )
+    with pytest.warns(FutureWarning, match="Passing `x_o`"):
+        constructed = EnsemblePotential(
+            potential_fns=components,
+            weights=torch.tensor([0.5, 0.5]),
+            prior=prior,
+            x_o=zeros(1, 2),
+        )
     assert all(p.return_x_o() is not None for p in constructed.potential_fns)
     assert torch.isfinite(constructed(zeros(1, 2))).all()
+
+
+def test_posterior_warns_when_it_uses_x_of_bound_potential():
+    """A default `x` taken from a bound potential warns when used, not when built:
+    a posterior built from another posterior's (bound) potential is fine."""
+    potential = _build_potential("posterior").bind(zeros(1, 2))
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", FutureWarning)
+        posterior = MCMCPosterior(potential, proposal=potential.prior)
+        posterior.potential(zeros(1, 2), x=ones(1, 2))
+
+    with pytest.warns(FutureWarning, match="uses the `x` bound to its potential"):
+        assert torch.equal(posterior.default_x, zeros(1, 2))
 
 
 def test_set_x_none_clears_observation():
@@ -363,7 +388,7 @@ def test_potential_counts_iid_trials_against_the_shape_of_one_observation():
         FCEmbedding(2, 8), trial_net_output_dim=8, output_dim=4
     )
     estimator = posterior_nn("mdn", embedding_net=embedding)(theta, x)
-    potential_fn, _ = posterior_estimator_based_potential(estimator, prior, None)
+    potential_fn, _ = posterior_estimator_based_potential(estimator, prior)
 
     theta_o = torch.tensor([[0.5, -0.5], [1.0, 1.0]])
     x_o = torch.stack([zeros(5, 2), ones(5, 2), -ones(5, 2)])
@@ -386,13 +411,13 @@ def test_potential_rejects_x_of_another_shape(estimator: str):
     theta, x = prior.sample((10,)), torch.randn(10, 3)
     if estimator == "posterior":
         net = posterior_nn("mdn")(theta, x)
-        potential_fn, _ = posterior_estimator_based_potential(net, prior, None)
+        potential_fn, _ = posterior_estimator_based_potential(net, prior)
     elif estimator == "likelihood":
         net = likelihood_nn("mdn")(theta, x)
-        potential_fn, _ = likelihood_estimator_based_potential(net, prior, None)
+        potential_fn, _ = likelihood_estimator_based_potential(net, prior)
     else:
         net = classifier_nn("mlp")(theta, x)
-        potential_fn, _ = ratio_estimator_based_potential(net, prior, None)
+        potential_fn, _ = ratio_estimator_based_potential(net, prior)
 
     assert potential_fn.bind(zeros(3)).x_o.shape == (1, 3)
     with pytest.raises(ValueError, match=r"x has shape \(2, 4\), but one observation"):
@@ -407,10 +432,10 @@ def test_potential_pairs_one_observation_with_every_theta(estimator: str):
     theta, x = prior.sample((10,)), torch.randn(10, 3)
     if estimator == "likelihood":
         net = likelihood_nn("mdn")(theta, x)
-        potential_fn, _ = likelihood_estimator_based_potential(net, prior, None)
+        potential_fn, _ = likelihood_estimator_based_potential(net, prior)
     else:
         net = classifier_nn("mlp")(theta, x)
-        potential_fn, _ = ratio_estimator_based_potential(net, prior, None)
+        potential_fn, _ = ratio_estimator_based_potential(net, prior)
 
     theta_o = prior.sample((4,))
     paired = potential_fn.bind(x[:1], x_is_iid=False)(theta_o, track_gradients=False)
@@ -425,7 +450,7 @@ def test_posterior_rejects_theta_of_another_width():
     prior = BoxUniform(-ones(2), ones(2))
     theta, x = prior.sample((10,)), torch.randn(10, 3)
     net = likelihood_nn("maf")(theta, x)
-    potential_fn, _ = likelihood_estimator_based_potential(net, prior, None)
+    potential_fn, _ = likelihood_estimator_based_potential(net, prior)
     posterior = ImportanceSamplingPosterior(potential_fn, proposal=prior)
 
     match = r"theta has shape \(4, 1\), but the prior has 2 parameter"

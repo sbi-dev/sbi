@@ -584,7 +584,7 @@ def test_api_snpe_c_posterior_correction(
     x = simulator(theta)
     posterior_estimator = inference.append_simulations(theta, x).train()
     potential_fn, theta_transform = posterior_estimator_based_potential(
-        posterior_estimator, prior, x_o
+        posterior_estimator, prior
     )
     if sample_with == "mcmc":
         mcmc_params_fast = mcmc_params_fast.with_param(method=mcmc_method)
@@ -593,13 +593,13 @@ def test_api_snpe_c_posterior_correction(
             theta_transform=theta_transform,
             proposal=prior,
             **asdict(mcmc_params_fast),
-        )
+        ).set_default_x(x_o)
     elif sample_with == "rejection":
         posterior = RejectionPosterior(
             potential_fn=potential_fn,
             proposal=prior,
             theta_transform=theta_transform,
-        )
+        ).set_default_x(x_o)
 
     # Posterior should be corrected for leakage even if num_rounds just 1.
     samples = posterior.sample((10,))
@@ -718,7 +718,7 @@ def test_sample_conditional(mcmc_params_accurate: MCMCPosteriorParameters):
     # Evaluate the conditional density be drawing samples and smoothing with a Gaussian
     # kde.
     potential_fn, theta_transform = posterior_estimator_based_potential(
-        posterior_estimator, prior=prior, x_o=x_o
+        posterior_estimator, prior=prior
     )
     (
         conditioned_potential_fn,

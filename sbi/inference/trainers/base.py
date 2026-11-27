@@ -1,14 +1,12 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import os
 import time
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import asdict
 from datetime import datetime
-from inspect import currentframe
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -84,6 +82,7 @@ from sbi.utils.pbar import end_progress_line, print_progress
 from sbi.utils.removed_names import RENAMED_METHODS
 from sbi.utils.sbiutils import (
     ImproperEmpirical,
+    _stacklevel_to_caller,
     get_simulations_since_round,
     load_with_version,
     save_with_version,
@@ -101,33 +100,6 @@ from sbi.utils.user_input_checks import (
     process_simulator,
 )
 from sbi.utils.user_input_checks_utils import move_distribution_to_device
-
-_SBI_ROOT = str(Path(__file__).parents[2]) + os.sep
-
-
-def _stacklevel_to_caller(default: int = 2) -> int:
-    """Return the `warnings.warn` stacklevel of the first frame outside sbi.
-
-    Trainers reach the training loop through a different number of internal frames
-    each, so no constant is right for all of them. A constant also makes Python's
-    "once per location" filter collapse every training run in a process into one
-    warning. (`warn(skip_file_prefixes=...)` would do this, but needs Python 3.12.)
-
-    Args:
-        default: Stacklevel to fall back to if every frame is inside sbi.
-
-    Returns:
-        Stacklevel that attributes the warning to the caller's own code.
-    """
-    frame = currentframe()
-    frame = frame.f_back if frame is not None else None
-    level = 1
-    while frame is not None:
-        if not frame.f_code.co_filename.startswith(_SBI_ROOT):
-            return level
-        frame = frame.f_back
-        level += 1
-    return default
 
 
 def infer(
