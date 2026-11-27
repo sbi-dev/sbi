@@ -557,6 +557,10 @@ def test_interval_guidance_config_tensor_bounds():
     config_float = IntervalGuidanceConfig(lower_bound=-1.0, upper_bound=1.0)
     assert config_float.lower_bound == -1.0
 
+    # Valid scalar float bounds with tight precision (e.g. 1.0 and 1.0 + 1e-8)
+    config_tight = IntervalGuidanceConfig(lower_bound=1.0, upper_bound=1.0 + 1e-8)
+    assert config_tight.lower_bound == 1.0
+
     # Invalid scalar float bounds
     with pytest.raises(
         ValueError, match=r"lower_bound.*must be less than.*upper_bound"

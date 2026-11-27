@@ -383,13 +383,22 @@ class IntervalGuidanceConfig:
         if self.lower_bound is None and self.upper_bound is None:
             raise ValueError("At least one of lower_bound or upper_bound is required.")
         if self.lower_bound is not None and self.upper_bound is not None:
-            lb = torch.as_tensor(self.lower_bound)
-            ub = torch.as_tensor(self.upper_bound)
-            if (lb >= ub).any():
-                raise ValueError(
-                    f"lower_bound ({self.lower_bound}) must be less than "
-                    f"upper_bound ({self.upper_bound})."
-                )
+            if isinstance(self.lower_bound, (int, float)) and isinstance(
+                self.upper_bound, (int, float)
+            ):
+                if self.lower_bound >= self.upper_bound:
+                    raise ValueError(
+                        f"lower_bound ({self.lower_bound}) must be less than "
+                        f"upper_bound ({self.upper_bound})."
+                    )
+            else:
+                lb = torch.as_tensor(self.lower_bound)
+                ub = torch.as_tensor(self.upper_bound, device=lb.device)
+                if (lb >= ub).any():
+                    raise ValueError(
+                        f"lower_bound ({self.lower_bound}) must be less than "
+                        f"upper_bound ({self.upper_bound})."
+                    )
 
 
 @register_guidance_method("interval", IntervalGuidanceConfig)
