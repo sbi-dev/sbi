@@ -13,7 +13,7 @@ from torch import Tensor, float32
 
 from sbi.sbi_types import Array, Proposal, SimulationOutput
 from sbi.utils.pbar import tqdm
-from sbi.utils.sbiutils import seed_all_backends
+from sbi.utils.sbiutils import seed_random_states
 
 
 def simulate_for_sbi(
@@ -65,7 +65,7 @@ def simulate_for_sbi(
         return torch.tensor([], dtype=float32), torch.tensor([], dtype=float32)
 
     seed = None if seed is None else int(seed)
-    seed_all_backends(seed)
+    seed_random_states(seed)
     theta = proposal.sample((num_simulations,))
     if theta.ndim < 2:
         raise ValueError(
