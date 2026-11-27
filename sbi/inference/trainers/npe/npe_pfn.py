@@ -295,6 +295,9 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
                 sample_with,
                 posterior_parameters,
                 filtered_direct_sampling_parameters=filtered_direct_sampling_parameters,
+                direct_sampling_parameters=direct_sampling_parameters,
+                rejection_sampling_parameters=rejection_sampling_parameters,
+                importance_sampling_parameters=importance_sampling_parameters,
             )
 
             self._posterior = FilteredDirectPosterior(
@@ -314,6 +317,7 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
             prior,
             sample_with,
             posterior_parameters,
+            filtered_direct_sampling_parameters=filtered_direct_sampling_parameters,
             direct_sampling_parameters=direct_sampling_parameters,
             rejection_sampling_parameters=rejection_sampling_parameters,
             importance_sampling_parameters=importance_sampling_parameters,
