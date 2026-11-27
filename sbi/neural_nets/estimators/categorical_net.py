@@ -4,7 +4,6 @@
 from typing import Callable, List, Optional, cast
 
 import torch
-from nflows.utils import torchutils
 from torch import Tensor, nn
 from torch.distributions import Categorical
 from torch.nn import functional as F
@@ -158,6 +157,14 @@ class CategoricalMADE(MADE):
             mapped[..., i] = lookup[indices[..., i].long()]
         return mapped
 
+    def _logits_from_embedded(
+        self, input: Tensor, embedded_condition: Optional[Tensor]
+    ) -> Tensor:
+        """Run MADE on flat inputs with pre-embedded context and apply category mask."""
+        out = super().forward(input, context=embedded_condition)
+        # masks out logits i.e. for variables with num_categories < max(num_categories)
+        return out.masked_fill(~self.mask.bool().flatten(), float("-inf"))
+
     def forward(self, input: Tensor, condition: Optional[Tensor] = None) -> Tensor:
         r"""Forward pass of the categorical density estimator network to compute the
         conditional density at a given time.
@@ -170,10 +177,10 @@ class CategoricalMADE(MADE):
             Predicted categorical logits. `(batch_size, *input_shape,
                 num_categories)`
         """
-        embedded_condition = self.embedding_net.forward(condition)
-        out = super().forward(input, context=embedded_condition)
-        # masks out logits i.e. for variables with num_categories < max(num_categories)
-        return out.masked_fill(~self.mask.bool().flatten(), float("-inf"))
+        embedded_condition = (
+            self.embedding_net.forward(condition) if condition is not None else None
+        )
+        return self._logits_from_embedded(input, embedded_condition)
 
     def log_prob(self, input: Tensor, condition: Optional[Tensor] = None) -> Tensor:
         r"""Return log-probability of samples.
@@ -212,36 +219,54 @@ class CategoricalMADE(MADE):
             context: Conditioning variable. `(batch_dim, *condition_shape)`.
 
         Returns:
-            Samples of shape `(*sample_shape, batch_dim)`.
+            Samples of shape `(*sample_shape, batch_dim, num_variables)`.
         """
-        num_samples = int(torch.prod(torch.tensor(sample_shape)))
+        num_samples = int(torch.Size(sample_shape).numel())
+        batch_dim = context.shape[0] if context is not None else 1
+        device = context.device if context is not None else self.mask.device
 
-        # Prepare context
-        if context is not None:
-            batch_dim = context.shape[0]
-            if context.ndim == 2:
-                context = context.unsqueeze(0)
-            if batch_dim == 1:
-                context = torchutils.repeat_rows(context, num_samples)
-        else:
-            context_dim = 0 if self.context_features is None else self.context_features
-            context = torch.zeros(num_samples, context_dim)
-            batch_dim = 1
+        if num_samples == 0 or batch_dim == 0:
+            out_dtype = (
+                self.values_lookup.dtype if self._needs_mapping else self.mask.dtype
+            )
+            return torch.empty(
+                (*sample_shape, batch_dim, self.num_variables),
+                device=device,
+                dtype=out_dtype,
+            )
+
+        total_batch = num_samples * batch_dim
 
         # Autoregressively sample from the conditional categorical distribution.
         # for i = 1, ..., num_variables:
         #   x_i ~ Categorical(logits=f_i(x_1, ..., x_{i-1}, c))
+        # Embed `context` once at its native `(batch_dim, *condition_shape)` shape and
+        # flatten `(num_samples, batch_dim)` into a single batch axis so MADE and
+        # BatchNorm1d always receive 2D `(N, features)` tensors.
         with torch.no_grad():
+            embedded_context: Optional[Tensor]
+            if context is not None:
+                embedded: Tensor = self.embedding_net.forward(context)
+                embedded_context = (
+                    embedded.unsqueeze(0)
+                    .expand(num_samples, *embedded.shape)
+                    .reshape(total_batch, *embedded.shape[1:])
+                )
+            else:
+                embedded_context = None
+
             # Zeros is fine here because values will be masked out anyway.
             samples = torch.zeros(
-                num_samples, batch_dim, self.num_variables, device=context.device
+                total_batch, self.num_variables, device=device, dtype=self.mask.dtype
             )
             for i in range(self.num_variables):
                 # generate outputs given all previously sampled variables.
-                outputs = self.forward(samples, context)
-                outputs = outputs.reshape(*samples.shape, self.max_num_categories)
+                outputs = self._logits_from_embedded(samples, embedded_context)
+                outputs = outputs.reshape(
+                    total_batch, self.num_variables, self.max_num_categories
+                )
                 # Select logits and sample only for variable i
-                samples[:, :, i] = Categorical(logits=outputs[:, :, i, :]).sample()
+                samples[:, i] = Categorical(logits=outputs[:, i, :]).sample()
 
         # Map sampled indices back to original categorical values if needed
         if self._needs_mapping:
