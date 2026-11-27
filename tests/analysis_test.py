@@ -97,6 +97,42 @@ def test_active_subspace_with_single_parameter() -> None:
     assert active_subspace.project(theta[:10], 1).shape == (10, num_dim)
 
 
+def test_active_subspace_eigenvalues_estimate_the_gradient_outer_product() -> None:
+    """The eigenvalues must not be scaled by the number of Monte Carlo samples.
+
+    The gradient of the potential below is `-theta`. The samples cycle through the
+    four sign patterns of a 2-D parameter, so the average gradient outer product is
+    exactly the identity for any number of samples, with eigenvalues all one.
+    """
+
+    class SignPosterior:
+        """Posterior with potential `-0.5 * theta^2` and deterministic samples."""
+
+        _device = "cpu"
+        prior = torch.distributions.Normal(torch.zeros(2), torch.ones(2))
+
+        def sample(self, sample_shape):
+            num_samples = torch.Size(sample_shape).numel()
+            signs = torch.tensor([
+                [1.0, 1.0],
+                [-1.0, 1.0],
+                [1.0, -1.0],
+                [-1.0, -1.0],
+            ])
+            return signs.repeat(num_samples // 4 + 1, 1)[:num_samples]
+
+        def potential(self, theta, track_gradients=False):
+            with torch.set_grad_enabled(track_gradients):
+                return -0.5 * (theta**2).sum(-1)
+
+    for num_samples in (8, 400):
+        eigen_values, _ = ActiveSubspace(SignPosterior()).find_directions(
+            posterior_log_prob_as_property=True,
+            num_monte_carlo_samples=num_samples,
+        )
+        assert torch.allclose(eigen_values, torch.ones(2), atol=1e-4)
+
+
 @pytest.mark.parametrize("num_candidates", (1_000,))
 def test_1d_marginals_peaks_from_kde(num_candidates):
     num_samples = 10_000
