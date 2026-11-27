@@ -221,7 +221,25 @@ class FilteredDirectPosterior(DirectPosterior):
             leakage_correction_params=leakage_correction_params,
         )
 
-    def leakage_correction(self, x: Tensor, *args, **kwargs) -> Tensor:
+    def potential(
+        self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
+    ) -> Tensor:
+        r"""Evaluate the potential after setting context for `x`.
+
+        Takes the arguments of `DirectPosterior.potential()`.
+        """
+        self._set_context_for_x_o(self._x_else_default_x(x))
+        return super().potential(theta, x, track_gradients)
+
+    def leakage_correction(
+        self,
+        x: Tensor,
+        num_rejection_samples: int = 10_000,
+        force_update: bool = False,
+        show_progress_bars: bool = False,
+        rejection_sampling_batch_size: int = 10_000,
+        max_num_draws: int = 1_000_000,
+    ) -> Tensor:
         """Estimate the leakage correction factor after setting context for `x`.
 
         Takes the arguments of `DirectPosterior.leakage_correction()`.
@@ -233,7 +251,14 @@ class FilteredDirectPosterior(DirectPosterior):
             self._one_observation_hint,
         )
         self._set_context_for_x_o(x_for_context)
-        return super().leakage_correction(x, *args, **kwargs)
+        return super().leakage_correction(
+            x,
+            num_rejection_samples,
+            force_update,
+            show_progress_bars,
+            rejection_sampling_batch_size,
+            max_num_draws,
+        )
 
     def log_prob_batched(
         self,

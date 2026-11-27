@@ -311,21 +311,38 @@ def test_filtered_direct_posterior_defers_max_sampling_batch_size(monkeypatch):
     assert received == [None, 7]
 
 
-def test_filtered_direct_posterior_sets_context_for_leakage_correction(monkeypatch):
-    """A direct `leakage_correction(x)` call draws with the context of this `x`."""
+def test_filtered_direct_posterior_sets_context_for_its_x(monkeypatch):
+    """`potential()` and `leakage_correction()` use the context of their own `x`."""
     events = []
-    monkeypatch.setattr(
-        DirectPosterior, "leakage_correction", lambda self, x: events.append("draw")
-    )
+    # Position of `x` in the arguments passed on to the parent.
+    for method, x_position in (("potential", 1), ("leakage_correction", 0)):
+        monkeypatch.setattr(
+            DirectPosterior,
+            method,
+            lambda self, *args, m=method, i=x_position: events.append((m, args[i])),
+        )
     posterior = object.__new__(FilteredDirectPosterior)
     monkeypatch.setattr(posterior, "_x_else_default_x", lambda x: x, raising=False)
     monkeypatch.setattr(
-        posterior, "_set_context_for_x_o", lambda x: events.append("context"), False
+        posterior,
+        "_set_context_for_x_o",
+        lambda x: events.append(("context", x)),
+        raising=False,
     )
+    x_a, x_b = zeros(1, 2), ones(1, 2)
 
-    posterior.leakage_correction(ones(1, 2))
+    posterior.potential(zeros(3, 2), x_a)
+    posterior.potential(zeros(3, 2), x_b)
+    posterior.leakage_correction(x_a)
 
-    assert events == ["context", "draw"]
+    assert [(name, int(x.sum())) for name, x in events] == [
+        ("context", 0),
+        ("potential", 0),
+        ("context", 2),
+        ("potential", 2),
+        ("context", 0),
+        ("leakage_correction", 0),
+    ]
 
 
 @pytest.mark.parametrize("reject_outside_prior", [True, False])
