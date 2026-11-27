@@ -12,6 +12,8 @@
   * Without any draw inside the prior support, `leakage_correction()` returns 0 with a warning, and `log_prob()` returns NaN for theta inside the prior support, per observation. Before, FMPE and NPSE raised a RuntimeError.
   * `RestrictedPrior.log_prob()` stops the same way: `prior_acceptance()` takes `max_num_draws`, by default the larger of `num_rejection_samples` and 1_000_000. Without any accepted draw, `log_prob()` is NaN inside the restriction, with a warning. Before, it could draw forever.
   * `accept_reject_sample()` no longer takes `sample_for_correction_factor`.
+* **Structured z-scoring uses the std over all values** ([#2240](https://github.com/sbi-dev/sbi/pull/2240)) instead of the mean of per-simulation stds, so z-scored inputs have variance one. Only newly built networks change.
+* **z-scoring leaves constant features unscaled** ([#2240](https://github.com/sbi-dev/sbi/pull/2240)): they get std one instead of `min_std`, which gave inputs up to 1e11. Only newly built networks change.
 
 ## v0.27.0
 

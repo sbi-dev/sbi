@@ -24,6 +24,7 @@ from sbi.analysis import (
 from sbi.analysis.sensitivity_analysis import Destandardize
 from sbi.inference import NPE
 from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
+from sbi.neural_nets.net_builders.vector_field_nets import _finite_z_score_stats
 from sbi.utils import BoxUniform, get_kde
 from sbi.utils.sbiutils import (
     Standardize,
@@ -705,16 +706,17 @@ def test_z_scoring_structured(z_x, z_theta, build_fn):
 
 
 @pytest.mark.parametrize("event_shape", [(1, 6, 6), (3, 6, 6), (2, 18)])
-def test_structured_z_scoring_uses_all_event_dims(event_shape):
-    """Structured std is the per-sample std over the whole event, whatever its shape."""
-    batch = torch.randn(50, *event_shape) * 3.0 + 1.0
-    expected_std = batch.flatten(start_dim=1).std(dim=1).mean()
+def test_structured_z_scoring_gives_unit_variance(event_shape):
+    """Structured z-scoring also counts the spread between simulations, so the
+    z-scored batch has std one, whatever the event shape."""
+    levels = torch.randn(50, *[1] * len(event_shape)) * 10.0
+    batch = torch.randn(50, *event_shape) + levels
 
-    _, t_std = z_standardization(batch, structured_dims=True)
+    t_mean, t_std = z_standardization(batch, structured_dims=True)
     z_net = standardizing_net(batch, structured_dims=True)
 
-    assert torch.allclose(t_std, expected_std)
-    assert torch.allclose(z_net._std, expected_std)
+    assert torch.allclose(((batch - t_mean) / t_std).std(), torch.tensor(1.0))
+    assert torch.allclose(z_net(batch).std(), torch.tensor(1.0))
 
 
 @pytest.mark.parametrize(
@@ -1023,3 +1025,22 @@ def test_sbi_warnings_use_module_loggers(caplog):
         clamp_and_warn("learning_rate", 5.0, 0.0, 1.0)
 
     assert [record.name for record in caplog.records] == ["sbi.utils.sbiutils"]
+
+
+@pytest.mark.parametrize("stats_fn", [z_standardization, _finite_z_score_stats])
+def test_constant_features_are_centred_not_rescaled(stats_fn):
+    """A feature whose values are all equal gets std one, as in scikit-learn, so
+    the float32 rounding of its mean does not become a huge input. A small but
+    real spread on a large level is still rescaled."""
+    batch = torch.cat(
+        [
+            torch.full((1000, 1), 3.3333),
+            1e4 + 1e-2 * torch.randn(1000, 1),
+        ],
+        dim=1,
+    )
+
+    mean, std = stats_fn(batch, False)
+
+    assert mean[0] == batch[0, 0] and std[0] == 1.0
+    assert std[1] < 0.1

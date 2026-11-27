@@ -1535,7 +1535,8 @@ def _finite_z_score_stats(
 
     Returns:
         Mean and standard deviation, of shape `input_shape` (independent) or
-        scalars (structured).
+        scalars (structured). Entries whose finite values are all equal, or that
+        have fewer than two finite values, get std one, as in `z_standardization`.
     """
     batch_x = batch_x.float()
     finite = torch.isfinite(batch_x)
@@ -1543,6 +1544,8 @@ def _finite_z_score_stats(
     dims = tuple(range(batch_x.dim())) if structured else (0,)
     count = finite.sum(dim=dims)
     too_few = count < 2
+    highest = torch.where(finite, batch_x, -torch.inf).amax(dim=dims)
+    constant = highest == torch.where(finite, batch_x, torch.inf).amin(dim=dims)
     if too_few.any():
         warnings.warn(
             "Some entries have fewer than two finite values in the data used for "
@@ -1551,9 +1554,10 @@ def _finite_z_score_stats(
         )
     mean = values.sum(dim=dims) / count.clamp(min=1)
     centered = torch.where(finite, batch_x - mean, torch.zeros_like(batch_x))
-    std = (centered.pow(2).sum(dim=dims) / (count - 1).clamp(min=1)).sqrt()
-    std = torch.where(too_few, torch.ones_like(std), std.clamp(min=min_std))
-    return mean, std
+    var = centered.pow(2).sum(dim=dims) / (count - 1).clamp(min=1)
+    mean = torch.where(constant, highest, mean)
+    std = torch.where(constant | too_few, torch.ones_like(var), var).sqrt()
+    return mean, std.clamp(min=min_std)
 
 
 def _simformer_config_from_kwargs(

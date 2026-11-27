@@ -138,8 +138,8 @@ def warn_if_invalid_for_zscoring(
     if len(constant_dims) > 0:
         warnings.warn(
             f"Data has constant values in dimension(s) {constant_dims.tolist()}. "
-            "These dimensions carry no information and will be mapped to zero after "
-            "z-scoring. Consider removing constant features from your data.",
+            "These dimensions carry no information. Consider removing constant "
+            "features from your data.",
             UserWarning,
             stacklevel=2,
         )
@@ -287,12 +287,11 @@ def standardizing_transform(
     """Builds standardizing transform for nflows
 
     Args:
-        batch_t: Batched tensor from which mean and std deviation (across
-            first dimension) are computed.
+        batch_t: Batched tensor from which mean and std deviation are computed,
+            across the first dimension or, for structured data, over all values.
         structured_dims: Whether data dimensions are structured (e.g., time-series,
-            images), which requires computing mean and std per sample first before
-            aggregating over samples for a single standardization mean and std for the
-            batch, or independent (default), which z-scores dimensions independently.
+            images), which uses one mean and one std over all values of the batch, or
+            independent (default), which z-scores dimensions independently.
         min_std:  Minimum value of the standard deviation to use when z-scoring to
             avoid division by zero.
 
@@ -312,12 +311,11 @@ def standardizing_transform_zuko(
     """Builds standardizing transform for Zuko flows
 
     Args:
-        batch_t: Batched tensor from which mean and std deviation (across
-            first dimension) are computed.
+        batch_t: Batched tensor from which mean and std deviation are computed,
+            across the first dimension or, for structured data, over all values.
         structured_dims: Whether data dimensions are structured (e.g., time-series,
-            images), which requires computing mean and std per sample first before
-            aggregating over samples for a single standardization mean and std for the
-            batch, or independent (default), which z-scores dimensions independently.
+            images), which uses one mean and one std over all values of the batch, or
+            independent (default), which z-scores dimensions independently.
         min_std:  Minimum value of the standard deviation to use when z-scoring to
             avoid division by zero.
 
@@ -407,30 +405,28 @@ def z_standardization(
     batch_t: Tensor,
     structured_dims: bool = False,
     min_std: float = 1e-14,
-) -> [Tensor, Tensor]:
+) -> Tuple[Tensor, Tensor]:
     """Computes mean and standard deviation for z-scoring
 
     Args:
-        batch_t: Batched tensor from which mean and std deviation (across
-            first dimension) are computed.
+        batch_t: Batched tensor from which mean and std deviation are computed,
+            across the first dimension or, for structured data, over all values.
         structured_dims: Whether data dimensions are structured (e.g., time-series,
-            images), which requires computing mean and std per sample first before
-            aggregating over samples for a single standardization mean and std for the
-            batch, or independent (default), which z-scores dimensions independently.
+            images), which uses one mean and one std over all values of the batch, or
+            independent (default), which z-scores dimensions independently.
         min_std:  Minimum value of the standard deviation to use when z-scoring to
             avoid division by zero.
 
     Returns:
-        Mean and standard deviation for z-scoring. From a single valid row, the
-        mean is that row and the std is one, so a net built from one row can load
-        trained weights.
+        Mean and standard deviation for z-scoring. Features whose values are all
+        equal get std one, as in scikit-learn's `StandardScaler`, so they are
+        centred but not rescaled. From a single valid row, the mean is that row and
+        the std is one, so a net built from one row can load trained weights.
     """
     is_valid_t, *_ = handle_invalid_x(batch_t, True)
     valid_t = batch_t[is_valid_t]
-
-    # Structured data gets a single mean over all dimensions, equivalent to the mean
-    # over per-sample means.
-    t_mean = torch.mean(valid_t) if structured_dims else torch.mean(valid_t, dim=0)
+    values = valid_t.reshape(-1) if structured_dims else valid_t
+    t_mean = values.mean(dim=0)
 
     if len(valid_t) == 1:
         warnings.warn(
@@ -444,17 +440,11 @@ def z_standardization(
         )
         return t_mean, torch.ones_like(t_mean)
 
-    if structured_dims:
-        # Compute std per-sample first, over all of its dimensions.
-        sample_std = torch.std(valid_t.flatten(start_dim=1), dim=1)
-        sample_std[sample_std < min_std] = min_std
-        # Average over all samples for batch std.
-        t_std = torch.mean(sample_std)
-    else:
-        t_std = torch.std(valid_t, dim=0)
-        t_std[t_std < min_std] = min_std
-
-    return t_mean, t_std
+    t_std = values.std(dim=0)
+    constant = values.amax(dim=0) == values.amin(dim=0)
+    t_mean = torch.where(constant, values[0], t_mean)
+    t_std = torch.where(constant, torch.ones_like(t_std), t_std)
+    return t_mean, t_std.clamp(min=min_std)
 
 
 class _MeanStdBuffers(nn.Module):
@@ -510,12 +500,11 @@ def standardizing_net(
     """Builds standardizing network
 
     Args:
-        batch_t: Batched tensor from which mean and std deviation (across
-            first dimension) are computed.
+        batch_t: Batched tensor from which mean and std deviation are computed,
+            across the first dimension or, for structured data, over all values.
         structured_dims: Whether data dimensions are structured (e.g., time-series,
-            images), which requires computing mean and std per sample first before
-            aggregating over samples for a single standardization mean and std for the
-            batch, or independent (default), which z-scores dimensions independently.
+            images), which uses one mean and one std over all values of the batch, or
+            independent (default), which z-scores dimensions independently.
         min_std:  Minimum value of the standard deviation to use when z-scoring to
             avoid division by zero.
 
