@@ -563,17 +563,27 @@ def process_simulator(
 
 
 # New simulator wrapper, deriving from #1175 refactoring of simulate_for_sbi.
-# For now it just blindly applies a cast to tensor to the input and the output
-# of the simulator. This is not efficient (~3 times slowdown), but is compatible
+# The simulator output is cast to tensor, while the input is passed in the type the
+# simulator expects. This is not efficient (~3 times slowdown), but is compatible
 # with the new joblib and, importantly, does not break previous code. It should
 # be removed with a future restructuring of the simulation pipeline.
 def wrap_as_joblib_efficient_simulator(
     simulator: Callable, prior, is_numpy_simulator
 ) -> Callable:
-    """Return a simulator that accepts `ndarray` and returns `Tensor` arguments."""
+    """Return a simulator that accepts `ndarray` or `Tensor` and returns a `Tensor`.
 
-    def joblib_simulator(theta: ndarray) -> Tensor:
-        return torch.as_tensor(simulator(torch.as_tensor(theta)), dtype=float32)
+    Args:
+        simulator: User simulator, possibly expecting numpy arrays.
+        prior: Processed prior (kept for backwards compatibility).
+        is_numpy_simulator: Whether the simulator needs numpy arrays as input.
+    """
+
+    def joblib_simulator(theta: Union[ndarray, Tensor]) -> Tensor:
+        if is_numpy_simulator:
+            theta_for_simulator = torch.as_tensor(theta).detach().cpu().numpy()
+        else:
+            theta_for_simulator = torch.as_tensor(theta)
+        return torch.as_tensor(simulator(theta_for_simulator), dtype=float32)
 
     return joblib_simulator
 
