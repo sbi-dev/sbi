@@ -424,9 +424,9 @@ class ActiveSubspace:
                 "self._regression_net is None, you must call `.train()` first."
             )
             predictions = self._regression_net.forward(thetas)
-        loss = predictions.mean()
-        loss.backward()
-        gradients = torch.squeeze(thetas.grad)
+        # Sum, not mean, so that each row of `thetas.grad` is the gradient at one theta.
+        predictions.sum().backward()
+        gradients = thetas.grad
         if norm_gradients_to_prior:
             if hasattr(self._posterior.prior, "stddev") and hasattr(
                 self._posterior.prior, "mean"
