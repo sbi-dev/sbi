@@ -276,9 +276,11 @@ def check_sbc(
 
     Args:
         ranks: Ranks for each SBC run and for each model parameter,
-            shape (N, dim_parameters)
-        prior_samples: N samples from the prior
-        dap_samples: N samples from the data-averaged posterior
+            shape (N, dim_parameters), or (N,) for a single parameter.
+        prior_samples: N samples from the prior, shape (N, dim_parameters), or
+            (N,) for a single parameter.
+        dap_samples: N samples from the data-averaged posterior, shape
+            (N, dim_parameters), or (N,) for a single parameter.
         num_posterior_samples: Number of posterior samples used for SBC ranking.
         num_c2st_repetitions: Number of times C2ST is repeated to estimate robustness.
 
@@ -289,7 +291,8 @@ def check_sbc(
           seed is fixed, see `check_uniformity_frequentist`.
         - c2st_ranks: C2ST accuracy between ranks and the discrete uniform baseline,
           one for each dim_parameters.
-        - c2st_dap: C2ST accuracy between prior and DAP samples, single value.
+        - c2st_dap: C2ST accuracy between prior and DAP samples,
+          one for each dim_parameters.
     """
     if ranks.shape[0] < 100:
         warnings.warn(
@@ -343,10 +346,6 @@ def check_prior_vs_dap(prior_samples: Tensor, dap_samples: Tensor) -> Tensor:
     if prior_samples.shape != dap_samples.shape:
         raise ValueError("Prior and DAP samples must have the same shape")
 
-    if prior_samples.ndim == 1:
-        prior_samples = prior_samples.unsqueeze(1)
-        dap_samples = dap_samples.unsqueeze(1)
-
     return torch.tensor([
         c2st(s1.unsqueeze(1), s2.unsqueeze(1))
         for s1, s2 in zip(prior_samples.T, dap_samples.T, strict=False)
@@ -371,9 +370,6 @@ def check_uniformity_frequentist(ranks: Tensor, num_posterior_samples: int) -> T
         ks_pvals: p-values of the Kolmogorov-Smirnov test of uniformity,
             one for each dim_parameters.
     """
-    if ranks.ndim == 1:
-        ranks = ranks.unsqueeze(1)
-
     kstest_pvals = torch.tensor(
         [
             kstest(
@@ -407,9 +403,6 @@ def check_uniformity_c2st(
         c2st_ranks: C2ST accuracy between ranks and the discrete uniform baseline,
             one for each dim_parameters.
     """
-    if ranks.ndim == 1:
-        ranks = ranks.unsqueeze(1)
-
     # Run C2ST multiple times to estimate stability
     c2st_scores = torch.tensor([
         [
