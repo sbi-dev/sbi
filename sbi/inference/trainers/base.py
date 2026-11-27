@@ -626,8 +626,8 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
             self._validate_posterior_parameters_consistency(
                 posterior_parameters, **kwargs
             )
-        else:
-            self._raise_deprecation_warning(deprecated_params, **kwargs)
+        self._raise_deprecation_warning(deprecated_params, **kwargs)
+        if posterior_parameters is None:
             posterior_parameters = self._build_posterior_parameters(
                 sample_with, **kwargs
             )
@@ -669,7 +669,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         elif sample_with == "mcmc":
             params = kwargs.get("mcmc_parameters", {}) or {}
             posterior_parameters = MCMCPosteriorParameters(
-                method=kwargs.get("mcmc_method", "slice_np_vectorized"), **params
+                method=kwargs.get("mcmc_method") or "slice_np_vectorized", **params
             )
         elif sample_with in ("ode", "sde"):
             params = kwargs.get("vectorfield_sampling_parameters", {}) or {}
@@ -680,7 +680,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         elif sample_with == "vi":
             params = kwargs.get("vi_parameters", {}) or {}
             posterior_parameters = VIPosteriorParameters(
-                vi_method=kwargs.get("vi_method", "rKL"), **params
+                vi_method=kwargs.get("vi_method") or "rKL", **params
             )
         elif sample_with == "importance":
             params = kwargs.get("importance_sampling_parameters", {}) or {}
@@ -726,39 +726,31 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
         self, deprecated_params: List[str], **kwargs
     ) -> None:
         """
-        Raise a deprecation warning if a deprecated posterior parameters or
-        non-default arguments are used.
+        Raise a deprecation warning if deprecated posterior parameters are used.
+
+        `mcmc_method` and `vi_method` count as used whenever they are set, also to
+        their old default values.
 
         Args:
             deprecated_params: List of deprecated posterior parameter names provided.
             **kwargs: Additional keyword arguments.
         """
 
-        deprecated_params = deprecated_params.copy()
-        default_mcmc_method = "slice_np_vectorized"
-        default_vi_method = "rKL"
-
-        # Check if deprecated parameters are used
-        if (
-            kwargs.get("mcmc_method") is not None
-            and kwargs.get("mcmc_method") != default_mcmc_method
-        ):
-            deprecated_params.append("mcmc_method")
-        if (
-            kwargs.get("vi_method") is not None
-            and kwargs.get("vi_method") != default_vi_method
-        ):
-            deprecated_params.append("vi_method")
+        deprecated_params = deprecated_params + [
+            name
+            for name in ("mcmc_method", "vi_method")
+            if kwargs.get(name) is not None
+        ]
 
         if deprecated_params:
             warnings.warn(
                 f"The following arguments are deprecated and"
-                " will be removed in a future version: "
+                " will be removed in sbi v0.29.0: "
                 f"{', '.join(deprecated_params)}. Please use `posterior_parameters`"
                 " instead. Refer to this guide for details:\n"
                 "https://sbi.readthedocs.io/en/latest/how_to_guide/19_posterior_parameters.html#",
                 FutureWarning,
-                stacklevel=2,
+                stacklevel=_stacklevel_to_caller(),
             )
 
     def _validate_no_duplicate_parameters(self, deprecated_params: List[str]) -> None:
@@ -801,10 +793,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
             )
         elif isinstance(posterior_parameters, MCMCPosteriorParameters):
             mcmc_method = kwargs.get("mcmc_method")
-            if (
-                mcmc_method != "slice_np_vectorized"
-                and posterior_parameters.method != mcmc_method
-            ):
+            if mcmc_method is not None and posterior_parameters.method != mcmc_method:
                 warnings.warn(
                     f"Conflicting mcmc_method='{mcmc_method}' ignored in favor of "
                     f"posterior_parameters.method='{posterior_parameters.method}'",
@@ -812,7 +801,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
                 )
         elif isinstance(posterior_parameters, VIPosteriorParameters):
             vi_method = kwargs.get("vi_method")
-            if vi_method != "rKL" and posterior_parameters.vi_method != vi_method:
+            if vi_method is not None and posterior_parameters.vi_method != vi_method:
                 warnings.warn(
                     f"Conflicting vi_method='{vi_method}' ignored in favor of "
                     f"posterior_parameters.vi_method='{posterior_parameters.vi_method}'",

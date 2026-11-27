@@ -412,7 +412,9 @@ def test_mcmc_target_accept_rejects_invalid_values(target_accept):
     "params",
     [
         dict(mcmc_method="slice_pymc"),
+        dict(mcmc_method="slice_np_vectorized"),
         dict(vi_method="fKL"),
+        dict(vi_method="rKL"),
         dict(vi_parameters={}),
         dict(mcmc_parameters={"thin": 10}),
     ],

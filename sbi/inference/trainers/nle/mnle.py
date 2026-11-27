@@ -156,16 +156,18 @@ class MNLE(LikelihoodEstimatorTrainer):
         density_estimator: Optional[MixedDensityEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: Literal["mcmc", "rejection", "vi"] = "mcmc",
-        mcmc_method: Literal[
-            "slice_np",
-            "slice_np_vectorized",
-            "hmc_pyro",
-            "nuts_pyro",
-            "slice_pymc",
-            "hmc_pymc",
-            "nuts_pymc",
-        ] = "slice_np_vectorized",
-        vi_method: Literal["rKL", "fKL", "IW", "alpha"] = "rKL",
+        mcmc_method: Optional[
+            Literal[
+                "slice_np",
+                "slice_np_vectorized",
+                "hmc_pyro",
+                "nuts_pyro",
+                "slice_pymc",
+                "hmc_pymc",
+                "nuts_pymc",
+            ]
+        ] = None,
+        vi_method: Optional[Literal["rKL", "fKL", "IW", "alpha"]] = None,
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         vi_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
@@ -192,7 +194,9 @@ class MNLE(LikelihoodEstimatorTrainer):
             prior: Prior distribution.
             sample_with: Method to use for sampling from the posterior. Must be one of
                 [`mcmc` | `rejection` | `vi`].
-            mcmc_method: Method used for MCMC sampling, one of `slice_np`,
+            mcmc_method: Deprecated, removed in sbi v0.29.0: pass
+                `MCMCPosteriorParameters(method=...)` instead. Method used for MCMC
+                sampling (default `slice_np_vectorized`), one of `slice_np`,
                 `slice_np_vectorized`, `hmc_pyro`, `nuts_pyro`, `slice_pymc`,
                 `hmc_pymc`, `nuts_pymc`. `slice_np` is a custom
                 numpy implementation of slice sampling. `slice_np_vectorized` is
@@ -200,7 +204,9 @@ class MNLE(LikelihoodEstimatorTrainer):
                 vectorized for `slice_np_vectorized` whereas they are run sequentially
                 for `slice_np`. The samplers ending on `_pyro` are using Pyro, and
                 likewise the samplers ending on `_pymc` are using PyMC.
-            vi_method: Method used for VI, one of [`rKL`, `fKL`, `IW`, `alpha`]. Note
+            vi_method: Deprecated, removed in sbi v0.29.0: pass
+                `VIPosteriorParameters(vi_method=...)` instead. Method used for VI
+                (default `rKL`), one of [`rKL`, `fKL`, `IW`, `alpha`]. Note
                 some of the methods admit a `mode seeking` property (e.g. rKL) whereas
                 some admit a `mass covering` one (e.g fKL).
             mcmc_parameters: Additional kwargs passed to `MCMCPosterior`.

@@ -141,8 +141,7 @@ def test_embedding_api_with_multiple_trials(
         posterior = inference.build_posterior().set_default_x(x_o)
     elif posterior_method == "mcmc":
         posterior = inference.build_posterior(
-            sample_with=posterior_method,
-            mcmc_method="slice_np_vectorized",
+            sample_with=posterior_method
         ).set_default_x(x_o)
     if num_xo_batch == 1:
         s = posterior.sample((1,), x=x_o)
