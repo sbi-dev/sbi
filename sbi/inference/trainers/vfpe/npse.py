@@ -79,20 +79,9 @@ class NPSE(VectorFieldTrainer):
             ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
             None,
         ] = None,
-        score_estimator: Optional[
-            Union[
-                VF_MODELS,
-                ScoreConfigBase,
-                ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
-            ]
-        ] = None,
-        density_estimator: Optional[
-            Union[
-                VF_MODELS,
-                ScoreConfigBase,
-                ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
-            ]
-        ] = None,
+        *,
+        score_estimator: None = None,
+        density_estimator: None = None,
         sde_type: Optional[Literal["vp", "ve", "subvp"]] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -113,8 +102,10 @@ class NPSE(VectorFieldTrainer):
                 mlp, ada_mlp, transformer, transformer_cross_attn).
                 Alternatively, a function that builds a custom neural
                 network can be provided.
-            score_estimator: Deprecated, use `vf_estimator` instead.
-            density_estimator: Deprecated, use `vf_estimator` instead.
+            score_estimator: Removed in sbi v0.28.0; passing it raises a
+                `TypeError`. Use `vf_estimator` instead.
+            density_estimator: Removed in sbi v0.28.0; passing it raises a
+                `TypeError`. Use `vf_estimator` instead.
             sde_type: Type of SDE to use. Must be one of ['vp', 've', 'subvp'].
                 Defaults to ``None`` (resolved to ``"ve"``). When
                 ``vf_estimator`` is ``None``, forwarded to the default
@@ -138,32 +129,16 @@ class NPSE(VectorFieldTrainer):
                 free inference with conditional score based diffusion models." ICML 2024
         """
         if score_estimator is not None:
-            if vf_estimator is not None:
-                raise ValueError(
-                    "Cannot pass both `score_estimator` and `vf_estimator`. "
-                    "Use `vf_estimator` only; `score_estimator` is deprecated."
-                )
-            warnings.warn(
-                "`score_estimator` is deprecated and will be removed in a future "
-                "release. Use `vf_estimator` instead.",
-                FutureWarning,
-                stacklevel=2,
+            raise TypeError(
+                "`score_estimator` was removed from NPSE in sbi v0.28.0. Pass the "
+                "estimator as `vf_estimator` instead."
             )
-            vf_estimator = score_estimator
 
         if density_estimator is not None:
-            if vf_estimator is not None:
-                raise ValueError(
-                    "Cannot pass both `density_estimator` and `vf_estimator`. "
-                    "Use `vf_estimator` only; `density_estimator` is deprecated."
-                )
-            warnings.warn(
-                "`density_estimator` is deprecated and will be removed in a future "
-                "release. Use `vf_estimator` instead.",
-                FutureWarning,
-                stacklevel=2,
+            raise TypeError(
+                "`density_estimator` was removed from NPSE in sbi v0.28.0. Pass the "
+                "estimator as `vf_estimator` instead."
             )
-            vf_estimator = density_estimator
 
         if isinstance(vf_estimator, ScoreConfigBase) and sde_type is not None:
             raise ValueError(

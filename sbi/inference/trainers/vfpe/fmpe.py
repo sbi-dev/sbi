@@ -82,13 +82,8 @@ class FMPE(VectorFieldTrainer):
             ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
             None,
         ] = None,
-        density_estimator: Optional[
-            Union[
-                VF_MODELS,
-                FlowMatchingConfig,
-                ConditionalEstimatorBuildFn[ConditionalVectorFieldEstimator],
-            ]
-        ] = None,
+        *,
+        density_estimator: None = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: None = None,
@@ -108,7 +103,8 @@ class FMPE(VectorFieldTrainer):
                 mlp, ada_mlp, transformer, transformer_cross_attn).
                 Alternatively, a function that builds a custom neural
                 network can be provided.
-            density_estimator: Deprecated. Use `vf_estimator` instead.
+            density_estimator: Removed in sbi v0.28.0; passing it raises a
+                `TypeError`. Use `vf_estimator` instead.
             device: Device to use for training.
             logging_level: Logging level.
             summary_writer: Removed in sbi v0.28.0; passing it raises a `TypeError`.
@@ -119,18 +115,10 @@ class FMPE(VectorFieldTrainer):
         """
 
         if density_estimator is not None:
-            if vf_estimator is not None:
-                raise ValueError(
-                    "Cannot pass both `density_estimator` and `vf_estimator`. "
-                    "Use `vf_estimator` only; `density_estimator` is deprecated."
-                )
-            warnings.warn(
-                "`density_estimator` is deprecated and will be removed in a future "
-                "release. Use `vf_estimator` instead.",
-                FutureWarning,
-                stacklevel=2,
+            raise TypeError(
+                "`density_estimator` was removed from FMPE in sbi v0.28.0. Pass the "
+                "estimator as `vf_estimator` instead."
             )
-            vf_estimator = density_estimator
 
         if vf_estimator is None:
             vf_estimator = FlowMatchingConfig()
