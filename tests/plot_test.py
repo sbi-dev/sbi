@@ -333,6 +333,18 @@ def test_sbc_rank_plot(num_parameters, num_cols, custom_figure, plot_type):
     close()
 
 
+def test_sbc_rank_plot_into_passed_axes():
+    """1D ranks in a list plot into a passed Axes and leave the list unchanged."""
+    ranks = [torch.randint(0, 101, (100,))]
+    _, ax = subplots()
+
+    sbc_rank_plot(ranks, 100, plot_type="hist", ax=ax)
+
+    assert len(ax.patches) > 0
+    assert isinstance(ranks[0], torch.Tensor)
+    close()
+
+
 @pytest.mark.parametrize("plot_type", ("hist", "cdf", "cdf-diff"))
 def test_sbc_rank_plot_bins_over_full_rank_range(plot_type):
     """Ranks, curves and bands use [0, N]; ranks are not stretched to fill it."""

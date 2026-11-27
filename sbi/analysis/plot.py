@@ -1685,9 +1685,10 @@ def sbc_rank_plot(
     Additional options can be passed via the kwargs argument, see _sbc_rank_plot.
 
     Args:
-        ranks: Tensor of ranks to be plotted shape (num_sbc_runs, num_parameters), or
-            list of Tensors when comparing several sets of ranks, e.g., set of ranks
-            obtained from different methods.
+        ranks: Tensor of ranks to be plotted shape (num_sbc_runs, num_parameters),
+            or (num_sbc_runs,) for a single parameter, or list of Tensors when
+            comparing several sets of ranks, e.g., set of ranks obtained from
+            different methods.
         num_posterior_samples: number of posterior samples used to compute the
             ranks. Ranks must lie in [0, num_posterior_samples].
         num_bins: number of bins used for binning the ranks, default is
@@ -1698,6 +1699,10 @@ def sbc_rank_plot(
         parameter_labels: list of labels for each parameter dimension.
         ranks_labels: list of labels for each set of ranks.
         colors: list of colors for each parameter dimension, or each set of ranks.
+        fig: figure object to plot in, defaults to the figure of `ax`.
+        ax: Axes to plot in: a single Axes, or an array with at least as many
+            subplots as parameters when they are plotted in separate subplots.
+        figsize: dimensions of figure object, default (8, 5) or (len(ranks) * 4, 5).
 
     Returns:
         fig, ax: figure and axis objects.
@@ -1748,9 +1753,10 @@ def _sbc_rank_plot(
     """Plot simulation-based calibration ranks as empirical CDFs or histograms.
 
     Args:
-        ranks: Tensor of ranks to be plotted shape (num_sbc_runs, num_parameters), or
-            list of Tensors when comparing several sets of ranks, e.g., set of ranks
-            obtained from different methods.
+        ranks: Tensor of ranks to be plotted shape (num_sbc_runs, num_parameters),
+            or (num_sbc_runs,) for a single parameter, or list of Tensors when
+            comparing several sets of ranks, e.g., set of ranks obtained from
+            different methods.
         num_posterior_samples: number of posterior samples used to compute the
             ranks. Ranks must lie in [0, num_posterior_samples].
         num_bins: number of bins used for binning the ranks, default is
