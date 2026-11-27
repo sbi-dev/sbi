@@ -38,8 +38,8 @@ def compute_rbf_mmd(x: Tensor, y: Tensor, bandwidth: float = 1.0, mode: str = "b
         if n < 2 or m < 2:
             raise ValueError(
                 "The unbiased MMD needs at least two samples in each set, got "
-                f"{n} and {m}. Use the biased MMD instead (mmd_mode='biased' in "
-                "calc_misspecification_mmd)."
+                f"{n} and {m}. Use the biased MMD instead (mode='biased', or "
+                "mmd_mode='biased' in calc_misspecification_mmd)."
             )
         # The unbiased estimator averages k(x_i, x_j) over pairs with i != j only,
         # so the diagonal k(x_i, x_i) is left out of the within-sample terms.
