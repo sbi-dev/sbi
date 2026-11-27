@@ -428,6 +428,25 @@ def test_transformer_embedding_scalar_timeseries(seq_length):
     _train_and_infer_with_embedding(prior, xo, simulator, net, "mdn", "NPE")
 
 
+def test_transformer_embedding_attention_mask_cache():
+    """Repeated calls with a padding mask match uncached calls."""
+    net = TransformerEmbedding(
+        feature_space_dim=16,
+        num_attention_heads=4,
+        num_key_value_heads=4,
+        num_hidden_layers=1,
+    ).eval()
+    x = torch.randn(3, 6, 16)
+    mask = torch.ones(3, 6)
+    padded = mask.clone()
+    padded[:, 4:] = 0
+
+    for attention_mask in (mask, mask, padded, mask):
+        out = net(x, attention_mask=attention_mask)
+        expected = net(x, attention_mask=attention_mask, cache_attention_mask=False)
+        assert torch.allclose(out, expected)
+
+
 def _train_and_infer_with_embedding(
     prior: utils.BoxUniform | MultivariateNormal,
     xo: Tensor,

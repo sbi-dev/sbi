@@ -954,11 +954,13 @@ class TransformerEmbedding(nn.Module):
             dtype, device = input.dtype, input.device
 
             cached_attn_mask, cached_mask, cached_shape = self.causal_mask_cache_
-            if (
-                cache_attention_mask
-                and input.shape == cached_shape
-                and cached_attn_mask == attention_mask
-            ):
+            if attention_mask is None or cached_attn_mask is None:
+                same_attn_mask = attention_mask is cached_attn_mask
+            else:
+                same_attn_mask = attention_mask.device == cached_attn_mask.device and (
+                    torch.equal(attention_mask, cached_attn_mask)
+                )
+            if cache_attention_mask and input.shape == cached_shape and same_attn_mask:
                 attention_mask = cached_mask
             else:
                 cache = (
