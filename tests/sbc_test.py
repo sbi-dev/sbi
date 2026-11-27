@@ -344,3 +344,18 @@ def test_sbc_batch_sampling(batch_sampling: bool, gaussian_setup: Dict):
     assert ranks.shape == (num_sbc_runs, gaussian_setup["num_dim"]), (
         f"Ranks shape incorrect with batched_sampling={batch_sampling}"
     )
+
+
+def test_check_sbc_1d_inputs():
+    """check_sbc treats 1D ranks and samples as a single parameter."""
+    num_posterior_samples = 100
+    ranks = torch.randint(0, num_posterior_samples + 1, (100,))
+
+    checks = check_sbc(
+        ranks,
+        torch.randn(100),
+        torch.randn(100, 1),
+        num_posterior_samples=num_posterior_samples,
+    )
+
+    assert all(value.shape == (1,) for value in checks.values())

@@ -276,9 +276,11 @@ def check_sbc(
 
     Args:
         ranks: Ranks for each SBC run and for each model parameter,
-            shape (N, dim_parameters)
-        prior_samples: N samples from the prior
-        dap_samples: N samples from the data-averaged posterior
+            shape (N, dim_parameters), or (N,) for a single parameter.
+        prior_samples: N samples from the prior, shape (N, dim_parameters), or
+            (N,) for a single parameter.
+        dap_samples: N samples from the data-averaged posterior, shape
+            (N, dim_parameters), or (N,) for a single parameter.
         num_posterior_samples: Number of posterior samples used for SBC ranking.
         num_c2st_repetitions: Number of times C2ST is repeated to estimate robustness.
 
@@ -289,7 +291,8 @@ def check_sbc(
           seed is fixed, see `check_uniformity_frequentist`.
         - c2st_ranks: C2ST accuracy between ranks and the discrete uniform baseline,
           one for each dim_parameters.
-        - c2st_dap: C2ST accuracy between prior and DAP samples, single value.
+        - c2st_dap: C2ST accuracy between prior and DAP samples,
+          one for each dim_parameters.
     """
     if ranks.shape[0] < 100:
         warnings.warn(
@@ -298,6 +301,13 @@ def check_sbc(
             "recommend using at least 100.",
             stacklevel=2,
         )
+
+    if ranks.ndim == 1:
+        ranks = ranks.unsqueeze(1)
+    if prior_samples.ndim == 1:
+        prior_samples = prior_samples.unsqueeze(1)
+    if dap_samples.ndim == 1:
+        dap_samples = dap_samples.unsqueeze(1)
 
     # Run uniformity checks
     ks_pvals = check_uniformity_frequentist(ranks, num_posterior_samples)
