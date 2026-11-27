@@ -1859,6 +1859,8 @@ def _sbc_rank_plot(
                 sharey=sharey,
             )
             ax = np.atleast_1d(ax)  # type: ignore
+            for unused_ax in ax.flat[num_parameters:]:
+                unused_ax.axis("off")
         else:
             ax = np.atleast_1d(ax)
             assert ax.size >= num_parameters, (
@@ -1918,9 +1920,6 @@ def _sbc_rank_plot(
         if plot_type == "hist" or num_ranks > 1:
             plt.sca(ax.flat[0])
             _sbc_legend(legend_kwargs)
-        # Remove empty subplots.
-        for unused_ax in ax.flat[num_parameters:]:
-            unused_ax.axis("off")
 
     # When there is only one set of ranks show all params in a single subplot.
     # Only "cdf" and "cdf-diff" get here: "hist" always uses subplots.
