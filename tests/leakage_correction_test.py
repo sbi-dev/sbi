@@ -117,7 +117,8 @@ def test_count_accepted_stops_at_target_or_cap_within_batch_size():
         max_sampling_batch_size=40,
     )
 
-    assert accepted.tolist() == [10, 0] and drawn.tolist() == [10, 75]
+    # The first call draws 20% more than the target of 10.
+    assert accepted.tolist() == [12, 0] and drawn.tolist() == [12, 75]
     assert max(draws_per_call) <= 40
 
 

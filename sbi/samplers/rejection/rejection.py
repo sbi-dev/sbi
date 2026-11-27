@@ -538,16 +538,17 @@ def count_accepted(
         num_drawn = 0
         while pending.numel() > 0:
             # Aim at the slowest pending observation: draw the expected number of draws
-            # for its missing hits, at its rate so far; before its first hit, draw
-            # twice as many as so far. Stay within the batch size and the cap.
+            # for its missing hits, at its rate so far, plus 20% so that one more call
+            # usually suffices; before its first hit, draw twice as many as so far.
+            # Stay within the batch size and the cap.
             fewest = int(accepted[pending].min())
-            num_draws = target_accepted - fewest
+            num_draws = 1.2 * (target_accepted - fewest)
             if fewest > 0:
-                num_draws = math.ceil(num_draws * num_drawn / fewest)
+                num_draws *= num_drawn / fewest
             elif num_drawn > 0:
                 num_draws = 2 * num_drawn
             num_draws = min(
-                num_draws,
+                math.ceil(num_draws),
                 max_sampling_batch_size // pending.numel(),
                 max_num_draws - num_drawn,
             )
