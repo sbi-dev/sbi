@@ -1931,7 +1931,6 @@ class VectorFieldConfigBase(_PerModelConfigBase):
             batch_condition, self.z_score_condition, self.embedding_net
         )
 
-        self._warn_unknown_extra_kwargs(self._ESTIMATOR_CLS.__init__)
         return self._ESTIMATOR_CLS(
             net=vectorfield_net,
             input_shape=batch_input[0].shape,
@@ -2196,7 +2195,6 @@ class SimformerConfigBase(_PerModelConfigBase):
             if z_score_bool
             else (0.0, 1.0)
         )
-        self._warn_unknown_extra_kwargs(self._ESTIMATOR_CLS.__init__)
         return self._ESTIMATOR_CLS(
             net=vectorfield_net,  # type: ignore[arg-type]
             input_shape=batch_inputs[0].shape,
