@@ -1065,6 +1065,9 @@ def test_z_scoring_keeps_float32_resolution():
                 mean, std = stats_fn(batch, structured)
             assert mean == 1e8
             assert torch.allclose(std, batch.double().std().float())
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        z_standardization(300 + 0.03 * torch.randn(1000, 1))  # ~1000 values per std
     with pytest.warns(UserWarning, match="resolves fewer"):
         x_mean, _ = z_standardization(x)
         nflows = standardizing_transform(x)
