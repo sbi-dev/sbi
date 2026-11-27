@@ -152,7 +152,7 @@ class DivergenceOptimizer(ABC):
 
         self._optimizer = optimizer(self.q.parameters(), **opt_kwargs)
         # Its state before any step, to restore on a rollback.
-        self._fresh_optimizer_state = deepcopy(self._optimizer.state_dict()["state"])
+        self._fresh_optimizer_state = deepcopy(self._optimizer.state_dict())
         self._scheduler = scheduler(self._optimizer, **scheduler_kwargs)
         # Loss and summary
         self.eps = eps
@@ -241,12 +241,12 @@ class DivergenceOptimizer(ABC):
         """
         for state_para, para in zip(self.state_dict, self.q.parameters(), strict=False):
             para.data = state_para.data.clone().to(para.device)
-        # The state from before any step (Adagrad builds one in its constructor), with
-        # the current settings, including a scheduler's. A copy, as the optimizer
-        # updates its state in place.
-        optimizer_state = self._optimizer.state_dict()
-        optimizer_state["state"] = deepcopy(self._fresh_optimizer_state)
-        self._optimizer.load_state_dict(optimizer_state)
+        # The state from before any step (Adagrad builds one in its constructor), a
+        # copy as the optimizer updates it in place. The live parameter groups stay,
+        # with every setting, including a scheduler's.
+        param_groups = self._optimizer.param_groups
+        self._optimizer.load_state_dict(deepcopy(self._fresh_optimizer_state))
+        self._optimizer.param_groups = param_groups
         if self.prior is not None:
             self.warm_up(warm_up_rounds)
 
@@ -409,7 +409,7 @@ class DivergenceOptimizer(ABC):
         scheduler_kwargs = filter_kwargs_for_func(sched_type.__init__, kwargs)
 
         self._optimizer = opt_type(self.q.parameters(), **opt_kwargs)
-        self._fresh_optimizer_state = deepcopy(self._optimizer.state_dict()["state"])
+        self._fresh_optimizer_state = deepcopy(self._optimizer.state_dict())
         self._scheduler = sched_type(self._optimizer, **scheduler_kwargs)
 
 

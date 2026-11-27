@@ -1085,7 +1085,7 @@ def test_rollback_keeps_the_optimizer_settings(monkeypatch):
     settings = optimizer._optimizer.param_groups[0]
     settings.update(lr=1e-4, momentum=0.5)  # as a scheduler may set them
     optimizer.resolve_state()
-    settings = optimizer._optimizer.param_groups[0]
+    assert optimizer._optimizer.param_groups[0] is settings
     kept = [settings[key] for key in ("lr", "momentum", "weight_decay")]
     assert kept == [1e-4, 0.5, 0.1]
     assert not optimizer._optimizer.state
