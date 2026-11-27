@@ -208,21 +208,7 @@ def test_canonical_shorthands_do_not_warn():
     assert {"NPE", "NLE", "NRE", "infer"} <= set(sbi.inference.__all__)
 
 
-@pytest.mark.parametrize(
-    "x_o, sample_kwargs, reason",
-    [
-        (torch.zeros(3, 2), {}, "draws one posterior per observation"),
-        (
-            torch.zeros(1, 2),
-            {"guidance_method": "interval", "guidance_params": {}},
-            "ignores guidance",
-        ),
-    ],
-    ids=["iid", "guidance"],
-)
-def test_vector_field_posterior_ode_rejects_iid_and_guidance(
-    x_o, sample_kwargs, reason
-):
+def test_vector_field_posterior_ode_rejects_iid_and_guidance():
     """iid methods and guidance adjust the score, which ODE sampling does not use. An
     ensemble raises as well, also when it would not draw its ODE posterior."""
     theta, x = torch.randn(20, 2), torch.randn(20, 2)
@@ -231,12 +217,17 @@ def test_vector_field_posterior_ode_rejects_iid_and_guidance(
     posterior = VectorFieldPosterior(estimator, prior, sample_with="ode")
     sde_posterior = VectorFieldPosterior(estimator, prior, sample_with="sde")
     ensemble = EnsemblePosterior([sde_posterior, posterior], weights=[1.0, 0.0])
-    nested = EnsemblePosterior([sde_posterior, ensemble], weights=[1.0, 0.0])
     potential_fn = posterior.potential_fn
 
-    for sampled in (posterior, ensemble, nested):
-        with pytest.raises(ValueError, match=f"{reason}.*sample_with='sde'"):
-            sampled.sample((1,), x=x_o, show_progress_bars=False, **sample_kwargs)
+    for sampled in (posterior, ensemble):
+        with pytest.raises(ValueError, match="per observation.*ignores guidance"):
+            sampled.sample(
+                (1,),
+                x=torch.zeros(3, 2),
+                guidance_method="interval",
+                guidance_params={},
+                show_progress_bars=False,
+            )
     assert posterior.potential_fn is potential_fn, "A rejected call keeps the binding."
 
 

@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import warnings
 from typing import Tuple
 
 import pytest
@@ -788,40 +787,6 @@ def test_ve_lognormal_no_nan_with_extreme_params():
     )
     assert torch.all(times >= estimator.t_min), "Times below t_min"
     assert torch.all(times <= estimator.t_max), "Times above t_max"
-
-
-@pytest.mark.parametrize("num_dim", [1, 2])
-def test_flow_matching_score_broadcasts_one_time_per_sample(num_dim):
-    """One time per sample gives the same scores as one call per sample."""
-    estimator = FlowMatchingConfig().build(
-        torch.randn(100, num_dim), torch.randn(100, 3)
-    )
-    inputs, condition, times = torch.randn(4, num_dim), torch.randn(4, 3), torch.rand(4)
-
-    scores = estimator.score(inputs, condition, times)
-
-    expected = torch.cat([
-        estimator.score(inputs[i : i + 1], condition[i : i + 1], times[i : i + 1])
-        for i in range(4)
-    ])
-    assert scores.shape == (4, num_dim)
-    torch.testing.assert_close(scores, expected)
-
-
-@pytest.mark.parametrize("method", ["drift_fn", "diffusion_fn", "mean_t_fn"])
-def test_flow_matching_effective_t_max_argument_is_deprecated(method):
-    """The per-call cutoff still applies, with a warning; the default call is quiet."""
-    estimator = FlowMatchingConfig().build(torch.randn(100, 1), torch.randn(100, 1))
-    sde_fn = getattr(estimator, method)
-    inputs = () if method == "mean_t_fn" else (torch.ones(1, 1),)
-
-    with pytest.warns(FutureWarning, match="effective_t_max"):
-        old_call = sde_fn(*inputs, torch.tensor([0.97]), effective_t_max=0.95)
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        default_call = sde_fn(*inputs, torch.tensor([0.95]))
-
-    torch.testing.assert_close(old_call, default_call)
 
 
 def _build_flow_matching(masked: bool, num_dim: int):

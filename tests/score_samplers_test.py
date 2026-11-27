@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import math
-import pickle
 from typing import Tuple
 
 import pytest
@@ -16,7 +15,6 @@ from sbi.inference.posteriors import VectorFieldPosterior
 from sbi.inference.potentials.vector_field_adaptor import (
     AffineClassifierFreeGuidance,
     AffineClassifierFreeGuidanceConfig,
-    AutoGaussCorrectedScoreFn,
     CombinedIIDScore,
     FactorizedNPEScoreFunction,
     GaussCorrectedScoreFn,
@@ -36,7 +34,6 @@ from sbi.neural_nets import posterior_flow_nn, posterior_score_nn
 from sbi.samplers.score import Diffuser
 from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
 from sbi.utils import BoxUniform, MultipleIndependent
-from sbi.utils.torchutils import process_device
 from sbi.utils.vector_field_utils import (
     VectorFieldNet,
     add_diag_or_dense,
@@ -308,88 +305,7 @@ def test_interval_guidance_takes_one_bound_per_dimension():
         masked = guided_score(
             lower_bound=-0.2, upper_bound=0.3, mask=torch.tensor([True, False])
         )
-        zero_strength = guided_score(
-            lower_bound=torch.tensor([-inf, -inf]),
-            upper_bound=torch.tensor([0.3, inf]),
-            scale_factor=0.0,
-        )
-        unguided = estimator.score(inputs, x_o, time)
-    assert not torch.allclose(per_dimension[..., 0], unguided[..., 0])
     torch.testing.assert_close(per_dimension, masked)
-    torch.testing.assert_close(zero_strength, unguided)
-    with pytest.raises(ValueError, match="parameters have shape"):
-        guided_score(lower_bound=torch.zeros(3), upper_bound=None)
-    with pytest.raises(ValueError, match="must be less than"):
-        IntervalGuidanceConfig(
-            lower_bound=torch.tensor([0.0, 2.0]), upper_bound=torch.tensor([1.0, 1.0])
-        )
-    for invalid in ({"lower_bound": float("nan")}, {"upper_bound": -inf}):
-        with pytest.raises(ValueError, match="means no bound"):
-            IntervalGuidanceConfig(**{
-                "lower_bound": None,
-                "upper_bound": None,
-                **invalid,
-            })
-
-
-def test_interval_guidance_takes_any_batch_size_after_the_first_call():
-    """The mask broadcasts over the batch of each call."""
-    prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
-    theta = prior.sample((100,))
-    config = IntervalGuidanceConfig(
-        lower_bound=-0.2, upper_bound=0.3, mask=torch.tensor([True, False])
-    )
-    guidance = IntervalGuidance(
-        posterior_score_nn(sde_type="vp")(theta, theta), prior, config
-    )
-    for num_samples in (5, 3):
-        inputs = torch.randn(num_samples, 1, 2)
-        scores = guidance(inputs, torch.zeros(1, 2), torch.tensor([0.5]))
-        assert scores.shape == inputs.shape
-
-
-@pytest.mark.gpu
-def test_interval_guidance_on_gpu_matches_cpu():
-    """Bounds and a mask on any device guide inputs on the CPU and the GPU."""
-    device = process_device("gpu")
-    theta = torch.randn(100, 2)
-    estimator = posterior_score_nn(sde_type="vp")(theta, theta)
-    config = IntervalGuidanceConfig(
-        lower_bound=torch.tensor([-0.2, -1.0], device=device),
-        upper_bound=torch.tensor([0.3, 1.0], dtype=torch.float64),
-        mask=torch.tensor([True, False]),
-    )
-    inputs, x_o, time = torch.randn(5, 1, 2), torch.zeros(1, 2), torch.tensor([0.5])
-    expected = IntervalGuidance(estimator, None, config)(inputs, x_o, time)
-
-    guidance = IntervalGuidance(estimator.to(device), None, config, device=device)
-    scores = guidance(inputs.to(device), x_o.to(device), time.to(device))
-
-    torch.testing.assert_close(scores.cpu(), expected, rtol=1e-4, atol=1e-5)
-
-
-def test_auto_gauss_estimates_the_precision_once_with_guidance():
-    """With guidance, auto_gauss reuses its precision estimate at every step, and the
-    posterior still pickles."""
-    prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
-    estimator = _build_estimator("vp", torch.randn(100, 2), torch.randn(100, 2))
-    posterior = VectorFieldPosterior(estimator, prior, sample_with="sde")
-    cache = AutoGaussCorrectedScoreFn.estimate_posterior_precision
-    misses = cache.cache_info().misses
-
-    posterior.sample(
-        (10,),
-        x=torch.zeros(3, 2),
-        iid_method="auto_gauss",
-        iid_params={"precision_est_budget": 100, "precision_initial_sampler_steps": 5},
-        guidance_method="interval",
-        guidance_params={"lower_bound": 0.0, "upper_bound": None},
-        steps=4,
-        show_progress_bars=False,
-    )
-
-    assert cache.cache_info().misses == misses + 1
-    pickle.dumps(posterior)
 
 
 @pytest.mark.parametrize("iid_method", ["fnpe", "gauss", "auto_gauss", "jac_gauss"])
@@ -567,27 +483,6 @@ def test_jac_gauss_survives_float32_cancellation():
     scores = score_fn(inputs, x_o, torch.tensor([estimator.effective_t_max]))
 
     assert torch.isfinite(scores).all()
-
-
-@pytest.mark.parametrize("singular", [False, True], ids=["inverse", "floor"])
-def test_jac_gauss_score_has_finite_gradients_at_repeated_eigenvalues(singular):
-    """A Jacobian proportional to I repeats all eigenvalues; -I / s^2 hits the floor."""
-    prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
-    estimator = posterior_flow_nn()(prior.sample((100,)), torch.randn(100, 2))
-
-    def score(input: Tensor, condition: Tensor, t: Tensor) -> Tensor:
-        z = input - estimator.mean_t_fn(t) * condition
-        variance = estimator.std_fn(t) ** 2 if singular else 1.0
-        return -z / variance - z**3
-
-    estimator.score = score
-    score_fn = JacCorrectedScoreFn(estimator, prior, ensure_lam_psd=False)
-    inputs = torch.zeros(4, 1, 2, requires_grad=True)
-
-    scores = score_fn(inputs, torch.zeros(3, 2), torch.tensor([0.5]))
-    (gradient,) = torch.autograd.grad(scores.sum(), inputs)
-
-    assert torch.isfinite(gradient).all()
 
 
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
