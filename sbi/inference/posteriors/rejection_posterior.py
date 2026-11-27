@@ -12,6 +12,7 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential, CustomPotential
 from sbi.samplers.rejection.rejection import rejection_sample
 from sbi.sbi_types import Proposal, Shape, TorchTransform
+from sbi.utils.torchutils import empty_samples, infer_empty_draw
 
 
 class RejectionPosterior(NeuralPosterior):
@@ -150,6 +151,12 @@ class RejectionPosterior(NeuralPosterior):
         """
         num_samples = torch.Size(sample_shape).numel()
         self.potential_fn = self._bind_iid(self._x_else_default_x(x))
+        if num_samples == 0:
+            shape_source = getattr(self.potential_fn, "prior", None)
+            if shape_source is None:
+                shape_source = getattr(self.proposal, "proposal", self.proposal)
+            event_shape, device = infer_empty_draw(shape_source)
+            return empty_samples(sample_shape, event_shape, device)
 
         potential = partial(self.potential_fn, track_gradients=True)
 

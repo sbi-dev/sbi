@@ -26,6 +26,8 @@ from sbi.samplers.rejection import rejection
 from sbi.sbi_types import Shape
 from sbi.utils.sbiutils import warn_if_outside_prior_support, within_support
 from sbi.utils.torchutils import (
+    empty_samples,
+    raise_if_empty_batch,
     split_leading_dim,
 )
 from sbi.utils.user_input_checks import check_prior
@@ -158,7 +160,13 @@ class DirectPosterior(NeuralPosterior):
         """
         num_samples = torch.Size(sample_shape).numel()
         x = self._x_else_default_x(x)
+        raise_if_empty_batch(x)
         self._check_num_observations(x.shape[0])
+
+        if num_samples == 0:
+            return empty_samples(
+                sample_shape, self.posterior_estimator.input_shape, self._device
+            )
 
         max_sampling_batch_size = (
             self.max_sampling_batch_size
@@ -242,6 +250,14 @@ class DirectPosterior(NeuralPosterior):
         x = self._process_x(x)
         num_samples = torch.Size(sample_shape).numel()
         num_xos = x.shape[0]
+        raise_if_empty_batch(x)
+
+        if num_samples == 0:
+            return empty_samples(
+                sample_shape,
+                (num_xos, *self.posterior_estimator.input_shape),
+                self._device,
+            )
 
         # throw warning if num_x * num_samples is too large
         if num_xos * num_samples > 2**21:  # 2 million-ish

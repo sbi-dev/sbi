@@ -10,8 +10,12 @@ import pytest
 import torch
 from torch.distributions import Independent, Normal, Uniform
 
+from sbi.inference import DirectPosterior
 from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
+from sbi.inference.potentials.base_potential import CustomPotentialWrapper
+from sbi.neural_nets import posterior_nn
 from sbi.samplers.rejection import accept_reject_sample, rejection_sample
+from sbi.utils import BoxUniform, RestrictedPrior
 from sbi.utils.sbiutils import warn_if_outside_prior_support
 
 
@@ -232,6 +236,165 @@ def test_low_acceptance_warning_only_while_samples_remain(
 
     assert samples.shape == (num_samples, 1)
     assert ("may take a long time" in caplog.text) is expect_warning
+
+
+def test_zero_samples_returns_empty_tensor_with_requested_shape():
+    samples, rates = accept_reject_sample(
+        proposal=DummyProposal(),
+        accept_reject_fn=always_reject_fn,
+        num_samples=0,
+    )
+    assert samples.shape == (0, 1)
+    assert rates.shape == (1,)
+
+    def batched_proposal(shape, **kwargs):
+        return torch.randn(shape[0], 2, 3)
+
+    samples, rates = accept_reject_sample(
+        proposal=batched_proposal,
+        accept_reject_fn=lambda theta: torch.ones(theta.shape[0], 2, dtype=torch.bool),
+        num_samples=0,
+        num_xos=2,
+    )
+    assert samples.shape == (0, 2, 3)
+    assert rates.shape == (2,)
+
+    samples, _ = accept_reject_sample(
+        proposal=lambda shape, **kwargs: torch.randn(shape[0], 1, 3),
+        accept_reject_fn=lambda theta: torch.ones(theta.shape[0], 1, dtype=torch.bool),
+        num_samples=0,
+        num_xos=1,
+    )
+    assert samples.shape == (0, 1, 3)
+
+    proposal = Uniform(-torch.ones(1), torch.ones(1))
+
+    def accept_all(theta):
+        return torch.ones(theta.shape[0], dtype=torch.bool)
+
+    samples, _ = accept_reject_sample(
+        proposal=proposal.sample,
+        accept_reject_fn=accept_all,
+        num_samples=0,
+    )
+    positive, _ = accept_reject_sample(
+        proposal=proposal.sample,
+        accept_reject_fn=accept_all,
+        num_samples=1,
+        max_sampling_batch_size=1,
+    )
+    assert samples.shape == (0, 1)
+    assert samples.shape[1:] == positive.shape[1:]
+
+    samples, _ = rejection_sample(
+        potential_fn=lambda theta: torch.zeros(theta.shape[0]),
+        proposal=proposal,
+        num_samples=0,
+    )
+    assert samples.shape == (0, 1)
+
+    batched = Independent(Normal(torch.zeros(2, 3), torch.ones(2, 3)), 1)
+    samples, _ = accept_reject_sample(
+        proposal=batched.sample,
+        accept_reject_fn=lambda theta: torch.ones(theta.shape[0], 2, dtype=torch.bool),
+        num_samples=0,
+        num_xos=2,
+    )
+    assert samples.shape == (0, 2, 3)
+
+    class MetaProposal:
+        def __call__(self, shape, **kwargs):
+            return torch.empty(shape[0], 1, device="meta")
+
+    samples, rates = accept_reject_sample(
+        proposal=MetaProposal(),
+        accept_reject_fn=always_reject_fn,
+        num_samples=0,
+    )
+    assert samples.device.type == rates.device.type == "meta"
+
+    prior = BoxUniform(torch.zeros(2), torch.ones(2))
+    theta = prior.sample((100,))
+    x = torch.randn(100, 2)
+    estimator = posterior_nn("maf", hidden_features=8, num_transforms=1)(theta, x)
+    posterior = DirectPosterior(estimator, prior).set_default_x(torch.zeros(2))
+
+    assert posterior.sample((0,)).shape == (0, 2)
+    assert posterior.sample_batched((0,), x=torch.zeros(3, 2)).shape == (0, 3, 2)
+    restricted = RestrictedPrior(
+        prior, lambda theta: torch.ones(theta.shape[0], dtype=torch.bool)
+    )
+    assert restricted.sample((0,)).shape == (0, 2)
+    composed = RestrictedPrior(
+        restricted, lambda theta: torch.ones(theta.shape[0], dtype=torch.bool)
+    )
+    assert composed.sample((0,)).shape == (0, 2)
+    with pytest.raises(ValueError, match="batch dimension"):
+        posterior.sample((5,), x=torch.empty(0, 2))
+    with pytest.raises(ValueError, match="batch dimension"):
+        posterior.sample_batched((5,), x=torch.empty(0, 2))
+
+
+def test_zero_samples_return_undefined_acceptance_rate():
+    """An empty request reports `nan` instead of an acceptance rate."""
+    proposal = Uniform(-torch.ones(1), torch.ones(1))
+
+    samples, acceptance_rate = rejection_sample(
+        potential_fn=lambda theta: torch.zeros(theta.shape[0]),
+        proposal=proposal,
+        num_samples=0,
+    )
+    assert samples.shape == (0, 1)
+    assert acceptance_rate.shape == ()
+    assert torch.isnan(acceptance_rate)
+
+    condition = torch.zeros(2, 1)
+    samples, acceptance_rates = accept_reject_sample(
+        proposal=lambda shape, **kwargs: torch.randn(shape[0], *condition.shape),
+        accept_reject_fn=lambda theta: torch.ones(theta.shape[0], 2, dtype=torch.bool),
+        num_samples=0,
+        proposal_sampling_kwargs={"condition": condition},
+    )
+    assert samples.shape == (0, 2, 1)
+    assert acceptance_rates.shape == (2,)
+    assert torch.isnan(acceptance_rates).all()
+
+
+def test_zero_samples_raise_when_shape_cannot_be_inferred():
+    class FailingProposal:
+        def __call__(self, shape, **kwargs):
+            raise RuntimeError("empty draws are not supported")
+
+    with pytest.raises(ValueError, match="Cannot determine the shape and device"):
+        accept_reject_sample(
+            proposal=FailingProposal(),
+            accept_reject_fn=always_reject_fn,
+            num_samples=0,
+        )
+
+
+def test_zero_rejection_posterior_does_not_probe_proposal():
+    prior = BoxUniform(torch.zeros(2), torch.ones(2))
+    potential = CustomPotentialWrapper(
+        lambda theta, x_o: torch.zeros(theta.shape[0]), prior=prior
+    )
+
+    class FailingProposal:
+        def sample(self, shape, **kwargs):
+            raise AssertionError("zero-sample request must not probe the proposal")
+
+    posterior = RejectionPosterior(potential_fn=potential, proposal=FailingProposal())
+    assert posterior.sample((0,), x=torch.zeros(1)).shape == (0, 2)
+
+
+def test_rejection_sample_stops_without_progress():
+    with pytest.raises(RuntimeError, match="No samples were accepted after"):
+        accept_reject_sample(
+            proposal=DummyProposal(),
+            accept_reject_fn=always_reject_fn,
+            num_samples=1,
+            max_sampling_batch_size=1,
+        )
 
 
 def test_warn_if_outside_prior_support():
