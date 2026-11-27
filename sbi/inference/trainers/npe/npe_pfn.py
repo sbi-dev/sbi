@@ -285,7 +285,13 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
                 f"Expected estimator to be TabPFNFlow, got {type(estimator).__name__}."
             )
 
-        if sample_with == "filtered_direct":
+        # Like the other trainers, a typed `posterior_parameters` selects the sampler.
+        use_filtered_direct = (
+            sample_with == "filtered_direct"
+            if posterior_parameters is None
+            else isinstance(posterior_parameters, FilteredDirectPosteriorParameters)
+        )
+        if use_filtered_direct:
             full_context_input, full_context_condition = full_theta, full_x
 
             prior = self._resolve_prior(prior, sample_with)
