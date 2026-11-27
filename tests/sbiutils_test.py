@@ -1059,12 +1059,13 @@ def test_z_scoring_keeps_float32_resolution():
     k = torch.arange(8.0)
     x = 1e6 + 0.0625 * torch.stack([k, (k == 7).float()], 1)  # in float32 steps
 
-    with pytest.warns(UserWarning, match="resolves fewer"):
-        for stats_fn in (z_standardization, _finite_z_score_stats):
-            for structured in (False, True):
+    for stats_fn in (z_standardization, _finite_z_score_stats):
+        for structured in (False, True):
+            with pytest.warns(UserWarning, match="resolves fewer"):
                 mean, std = stats_fn(batch, structured)
-                assert mean == 1e8
-                assert torch.allclose(std, batch.double().std().float())
+            assert mean == 1e8
+            assert torch.allclose(std, batch.double().std().float())
+    with pytest.warns(UserWarning, match="resolves fewer"):
         x_mean, _ = z_standardization(x)
         nflows = standardizing_transform(x)
         zuko_t = standardizing_transform_zuko(x)()
