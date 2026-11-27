@@ -35,6 +35,7 @@ from sbi.neural_nets.net_builders.estimator_configs import (
 )
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
+    _warn_if_below_float32_resolution,
     build_z_scored_embedding_net,
     z_score_parser,
     z_standardization,
@@ -1554,8 +1555,12 @@ def _finite_z_score_stats(
         )
     mean = values.sum(dim=dims) / count.clamp(min=1)
     centered = torch.where(finite, batch_x - mean, torch.zeros_like(batch_x))
-    var = centered.pow(2).sum(dim=dims) / (count - 1).clamp(min=1)
+    # Corrected two-pass: the second term removes the rounding of the float32 mean.
+    correction = centered.sum(dim=dims) ** 2 / count.clamp(min=1)
+    sum_sq = centered.pow(2).sum(dim=dims) - correction
+    var = sum_sq.clamp(min=0) / (count - 1).clamp(min=1)
     mean = torch.where(constant, highest, mean)
+    _warn_if_below_float32_resolution(mean, var.sqrt(), constant | too_few)
     std = torch.where(constant | too_few, torch.ones_like(var), var).sqrt()
     return mean, std.clamp(min=min_std)
 

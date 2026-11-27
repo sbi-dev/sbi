@@ -32,6 +32,8 @@ from sbi.utils.sbiutils import (
     gradient_ascent,
     mcmc_transform,
     standardizing_net,
+    standardizing_transform,
+    standardizing_transform_zuko,
     warn_if_invalid_for_zscoring,
     z_score_parser,
     z_standardization,
@@ -1044,3 +1046,19 @@ def test_constant_features_are_centred_not_rescaled(stats_fn):
 
     assert mean[0] == batch[0, 0] and std[0] == 1.0
     assert std[1] < 0.1
+
+
+def test_z_scoring_keeps_float32_resolution():
+    """Eight consecutive float32 values at 1e6 keep their exact std, and the flows'
+    z-scoring keeps them distinct."""
+    x = (1e6 + 0.0625 * torch.arange(8, dtype=torch.float64)).float().unsqueeze(1)
+    std = x.double().std().float()
+
+    with pytest.warns(UserWarning, match="float32"):
+        for stats_fn in (z_standardization, _finite_z_score_stats):
+            for structured in (False, True):
+                assert torch.allclose(stats_fn(x, structured)[1], std)
+        z_nflows, _ = standardizing_transform(x)(x)
+        z_zuko = standardizing_transform_zuko(x)()(x)
+
+    assert z_nflows.unique().numel() == z_zuko.unique().numel() == 8

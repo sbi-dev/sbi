@@ -447,7 +447,7 @@ def test_none_means_no_z_scoring(factory_fn, z_kwargs):
         return [
             type(m).__name__
             for m in net.modules()
-            if type(m).__name__ in ("Standardize", "PointwiseAffineTransform")
+            if type(m).__name__ in ("Standardize", "_CenteredPointwiseAffineTransform")
         ]
 
     assert standardizing(from_none) == []

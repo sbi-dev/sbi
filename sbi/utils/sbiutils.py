@@ -299,7 +299,33 @@ def standardizing_transform(
         Affine transform for z-scoring
     """
     t_mean, t_std = z_standardization(batch_t, structured_dims, min_std)
-    return nflows_tf.PointwiseAffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
+    return _CenteredPointwiseAffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
+
+
+class _CenteredPointwiseAffineTransform(nflows_tf.PointwiseAffineTransform):
+    """z-scoring as `(x - mean) * scale`, with `mean = -shift / scale`.
+
+    The parent's `x * scale + shift` rounds `x * scale`, which is about mean / std,
+    before the shift cancels it, and so can merge distinct float32 values. The
+    buffers are the parent's, so state dicts load in both directions.
+    """
+
+    def forward(
+        self, inputs: Tensor, context: Optional[Tensor] = None
+    ) -> Tuple[Tensor, Tensor]:
+        batch_size, *batch_shape = inputs.size()
+        mean = -self._shift / self._scale
+        outputs = (inputs - mean) * self._scale
+        return outputs, self._batch_logabsdet(batch_shape).expand(batch_size)
+
+
+class _CenteredAffineTransform(AffineTransform):
+    """z-scoring as `(x - mean) * scale`, with `mean = -loc / scale`; see
+    `_CenteredPointwiseAffineTransform`."""
+
+    def _call(self, x: Tensor) -> Tensor:
+        mean = -self.loc / self.scale
+        return (x - mean) * self.scale
 
 
 # NOTE: we need a separate function for zuko to return the precise type for pyright.
@@ -324,7 +350,7 @@ def standardizing_transform_zuko(
     """
     t_mean, t_std = z_standardization(batch_t, structured_dims, min_std)
     return zuko.flows.UnconditionalTransform(
-        AffineTransform,
+        _CenteredAffineTransform,
         loc=-t_mean / t_std,
         scale=1 / t_std,
         buffer=True,
@@ -440,11 +466,37 @@ def z_standardization(
         )
         return t_mean, torch.ones_like(t_mean)
 
-    t_std = values.std(dim=0)
     constant = values.amax(dim=0) == values.amin(dim=0)
     t_mean = torch.where(constant, values[0], t_mean)
+    # Centre before the std: else the rounding of the float32 mean adds to the
+    # variance. `valid_t` is a copy, so this works in place.
+    t_std = values.sub_(t_mean).std(dim=0)
+    _warn_if_below_float32_resolution(t_mean, t_std, constant)
     t_std = torch.where(constant, torch.ones_like(t_std), t_std)
     return t_mean, t_std.clamp(min=min_std)
+
+
+def _warn_if_below_float32_resolution(mean: Tensor, std: Tensor, skip: Tensor) -> None:
+    """Warn about features whose std is below 1e-4 of their mean.
+
+    float32 then resolves fewer than about 1000 values per std, so the data has
+    lost precision before z-scoring.
+
+    Args:
+        mean: Mean of each feature.
+        std: Standard deviation of each feature.
+        skip: Features not to check, e.g. constant ones.
+    """
+    low = (~skip & (std < 1e-4 * mean.abs())).flatten()
+    if low.any():
+        warnings.warn(
+            f"Dimension(s) {low.nonzero().flatten().tolist()} have a std below 1e-4 "
+            "of their mean, so float32 resolves fewer than about 1000 values per "
+            "std. Subtract an offset from these values before training (and from "
+            "the prior, for parameters).",
+            UserWarning,
+            stacklevel=3,
+        )
 
 
 class _MeanStdBuffers(nn.Module):

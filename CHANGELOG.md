@@ -10,6 +10,11 @@
   * Only newly built networks change. Trained networks keep their z-scoring mean and std in buffers, so saved, pickled or `load_state_dict()`-restored models behave as before. Training again with the same settings gives a different network.
 * **z-scoring leaves constant features unscaled** ([#2240](https://github.com/sbi-dev/sbi/pull/2240)): a feature whose training values are all equal now gets std one, as in scikit-learn's `StandardScaler`, so it is centred but not rescaled. Before, its std was raised to `min_std` (1e-14 or 1e-7): float32 rounding of its mean gave training inputs up to 1e8, and an observation 1e-3 away from the constant gave inputs up to 1e11. This holds for all z-scoring modes and estimators, the Simformer included. As above, only newly built networks change.
 
+### 🐛 Bug Fixes
+
+* **z-scoring keeps float32 precision for data with a large level and a small spread**: the flows' z-scoring of the modelled variable (theta in NPE, x in NLE) computed `x * (1 / std) - mean / std`, which rounds the large product before the mean cancels it and could merge neighbouring float32 values; it now subtracts the mean first, like every other z-scoring in sbi. The std of a single feature, of structured data and of the Simformer's inputs was computed around a rounded float32 mean, which inflated it once the spread was a few float32 steps of the level (from about 3e6 times smaller than the mean); it is now computed from centred values. sbi now warns when a std is below 1e-4 of its mean, where float32 resolves fewer than about 1000 values per std.
+  * Trained networks are unaffected: the transforms keep their buffers and names, so old state dicts load into new networks and new ones into old, and pickled models keep their old arithmetic. Newly built networks differ from before only by float32 rounding.
+
 ## v0.27.0
 
 ### ✨ Highlights
