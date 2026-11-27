@@ -144,7 +144,9 @@ class NPE_B(PosteriorEstimatorTrainer):
         # Evaluate prior
         # we accept prior log prob to be -Inf at theta
         # meaning that theta is out of the prior range (the weight is thus 0)
-        log_prior = self._prior.log_prob(theta)
+        # A 1-D prior or proposal without `Independent` returns shape (N, 1).
+        num_theta = theta.shape[0]
+        log_prior = self._prior.log_prob(theta).reshape(num_theta)
         utils.assert_not_nan_or_plus_inf(
             log_prior, "prior log probs of proposal samples"
         )
@@ -171,7 +173,7 @@ class NPE_B(PosteriorEstimatorTrainer):
         for k, (_, density) in enumerate(appends):
             # we accept the k th proposal log prob to be -Inf at theta
             # meaning that theta is out of the k th proposal range
-            log_previous_proposals[:, k] = density.log_prob(theta)
+            log_previous_proposals[:, k] = density.log_prob(theta).reshape(num_theta)
             utils.assert_not_nan_or_plus_inf(
                 log_previous_proposals[:, k], "proposal log probs of proposal samples"
             )
