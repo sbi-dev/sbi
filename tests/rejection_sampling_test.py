@@ -164,6 +164,32 @@ def test_reject_outside_prior_support_behavior():
     assert torch.all(no_reject == 5.0)
 
 
+def test_accept_reject_sample_counts_accepted_samples_over_batches():
+    """Two observations that accept on alternate draws stop once each has its
+    samples, and keep only as many as requested."""
+    draws = iter(range(100))
+
+    def proposal(sample_shape, **kwargs):
+        values = torch.tensor([float(next(draws)) for _ in range(sample_shape[0])])
+        return values.reshape(-1, 1, 1).expand(-1, 2, 1)
+
+    def accept_alternating(theta):
+        values = theta[:, 0, 0].long()
+        return torch.stack((values % 2 == 0, values % 2 == 1), dim=1)
+
+    samples, acceptance_rate = accept_reject_sample(
+        proposal=proposal,
+        accept_reject_fn=accept_alternating,
+        num_samples=2,
+        num_xos=2,
+        max_sampling_batch_size=1,
+    )
+
+    assert next(draws) == 4, "The loop must stop after four draws."
+    assert samples[:, :, 0].T.tolist() == [[0, 2], [1, 3]]
+    assert acceptance_rate.tolist() == [0.5, 0.5]
+
+
 def test_accept_reject_sample_partial_return():
     """Test that return_partial_on_timeout returns collected samples."""
 

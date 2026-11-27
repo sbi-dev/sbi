@@ -175,6 +175,13 @@ def test_batched_sample_log_prob_with_different_x(
         assert log_probs_2d.shape == (1, x_o_batch_dim), "2D theta logprob shape wrong"
         assert torch.allclose(log_probs_2d[0], batched_log_probs[0], atol=1e-1)
 
+        # Several sample axes give the values of the flat call.
+        theta_4d = samples.reshape(2, 5, *samples.shape[1:])
+        log_probs_4d = posterior.log_prob_batched(theta_4d, x_o)
+        assert torch.allclose(
+            log_probs_4d, batched_log_probs.reshape(2, 5, -1), atol=1e-4
+        ), "Several sample axes give other values than the flat call."
+
     # Test consistency with non-batched log_prob
     # NOTE: Leakage factor is a MC estimate, so we need to relax the tolerance here.
     if x_o_batch_dim == 0:
@@ -309,6 +316,40 @@ def test_filtered_direct_posterior_defers_max_sampling_batch_size(monkeypatch):
     posterior.sample((1,), x=ones(1, 2), max_sampling_batch_size=7)
 
     assert received == [None, 7]
+
+
+def test_filtered_direct_posterior_sets_context_for_its_x(monkeypatch):
+    """`potential()` and `leakage_correction()` use the context of their own `x`."""
+    events = []
+    # Position of `x` in the arguments passed on to the parent.
+    for method, x_position in (("potential", 1), ("leakage_correction", 0)):
+        monkeypatch.setattr(
+            DirectPosterior,
+            method,
+            lambda self, *args, m=method, i=x_position: events.append((m, args[i])),
+        )
+    posterior = object.__new__(FilteredDirectPosterior)
+    monkeypatch.setattr(posterior, "_x_else_default_x", lambda x: x, raising=False)
+    monkeypatch.setattr(
+        posterior,
+        "_set_context_for_x_o",
+        lambda x: events.append(("context", x)),
+        raising=False,
+    )
+    x_a, x_b = zeros(1, 2), ones(1, 2)
+
+    posterior.potential(zeros(3, 2), x_a)
+    posterior.potential(zeros(3, 2), x_b)
+    posterior.leakage_correction(x_a)
+
+    assert [(name, int(x.sum())) for name, x in events] == [
+        ("context", 0),
+        ("potential", 0),
+        ("context", 2),
+        ("potential", 2),
+        ("context", 0),
+        ("leakage_correction", 0),
+    ]
 
 
 @pytest.mark.parametrize("reject_outside_prior", [True, False])

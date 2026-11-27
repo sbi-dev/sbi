@@ -3,7 +3,7 @@
 
 import math
 import warnings
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Any, Dict, Literal, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -12,6 +12,7 @@ from torch.distributions import Distribution
 from sbi.inference.posteriors.base_posterior import (
     _LEAKAGE_HINT,
     NeuralPosterior,
+    _normalize_by_support_mass,
     _require_one_observation,
 )
 from sbi.inference.potentials.vector_field_potential import (
@@ -512,11 +513,10 @@ class VectorFieldPosterior(NeuralPosterior):
         if is_iid:
             warnings.warn("The log-probability is unnormalized!", stacklevel=2)
         elif norm_posterior:
-            log_prob = log_prob - torch.log(
-                self.leakage_correction(
-                    x=x, ode_kwargs=ode_kwargs, **(leakage_correction_params or {})
-                )
+            mass = self.leakage_correction(
+                x=x, ode_kwargs=ode_kwargs, **(leakage_correction_params or {})
             )
+            log_prob = _normalize_by_support_mass(log_prob, mass)
         return log_prob
 
     def leakage_correction(
@@ -525,20 +525,28 @@ class VectorFieldPosterior(NeuralPosterior):
         num_rejection_samples: int = 10_000,
         force_update: bool = False,
         ode_kwargs: Optional[Dict] = None,
+        max_num_draws: Optional[int] = None,
     ) -> Tensor:
         r"""Return the probability mass of the ODE density inside the prior support.
 
-        The mass is the fraction of probability flow ODE samples inside the prior
-        support. It is 1 for unbounded priors. The factor is saved for the last `x`
-        and re-estimated whenever `x` or `num_rejection_samples` changes, or for any
+        The mass is the share of probability flow ODE samples inside the prior
+        support. It draws until `num_rejection_samples` samples are inside or
+        `max_num_draws` samples are drawn. Without any sample inside, the mass is 0,
+        with a warning, and `log_prob()` is NaN inside the prior support. It is 1 for
+        unbounded priors. The factor is saved for the last `x` and re-estimated
+        whenever `x`, `num_rejection_samples` or `max_num_draws` changes, or for any
         call with `ode_kwargs`.
 
         Args:
             x: A single observation.
-            num_rejection_samples: Number of ODE samples used to estimate the factor.
+            num_rejection_samples: Number of ODE samples inside the prior support
+                after which the estimate stops.
             force_update: Whether to re-estimate the factor even if it is saved.
             ode_kwargs: Additional keyword arguments for the ODE solver. Must match
                 the ones used for the density that is corrected.
+            max_num_draws: Number of ODE samples after which the estimate stops,
+                whatever it found inside. Defaults to the larger of
+                `num_rejection_samples` and 10_000.
 
         Returns:
             Saved or newly-estimated correction factor (as a scalar `Tensor`).
@@ -549,37 +557,31 @@ class VectorFieldPosterior(NeuralPosterior):
             "`leakage_correction()` of a vector field posterior",
             "Pass one observation.",
         )
+        if max_num_draws is None:
+            max_num_draws = max(num_rejection_samples, 10_000)
 
-        def acceptance() -> Tensor:
+        def counts() -> Tuple[Tensor, Tensor]:
             self.potential_fn = self.potential_fn.bind(x, **(ode_kwargs or {}))
-            batch_size = self.max_sampling_batch_size
-            num_inside = sum(
-                within_support(
-                    self.prior,
-                    self.sample_via_ode(
-                        (min(batch_size, num_rejection_samples - start),),
-                        **(ode_kwargs or {}),
-                    ),
-                ).sum()
-                for start in range(0, num_rejection_samples, batch_size)
+            return rejection.count_accepted(
+                proposal=lambda num_draws, _: self.sample_via_ode(
+                    (num_draws,), **(ode_kwargs or {})
+                ),
+                accept_reject_fn=lambda theta: within_support(self.prior, theta),
+                num_xos=1,
+                target_accepted=num_rejection_samples,
+                max_num_draws=max_num_draws,
+                max_sampling_batch_size=self.max_sampling_batch_size,
             )
-            mass = torch.as_tensor(num_inside / num_rejection_samples)
-            if mass == 0:
-                raise RuntimeError(
-                    f"None of {num_rejection_samples} ODE samples lie inside the prior "
-                    "support, so `log_prob()` cannot be normalized. Use "
-                    "`norm_posterior=False` to get the unnormalized log-probability."
-                )
-            return mass
 
         return self._cached_leakage_factor(
             x,
-            num_rejection_samples,
+            (num_rejection_samples, max_num_draws),
             self.prior,
-            acceptance,
+            counts,
+            _LEAKAGE_HINT,
             force_update,
             use_cache=not ode_kwargs,
-        )
+        ).reshape(())
 
     def sample_batched(
         self,
