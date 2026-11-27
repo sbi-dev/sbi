@@ -9,7 +9,7 @@ from dataclasses import asdict
 import pytest
 import torch
 from torch import Tensor, eye, ones, zeros
-from torch.distributions import MultivariateNormal, Normal
+from torch.distributions import Independent, MultivariateNormal, Normal
 
 from sbi.inference import (
     ImportanceSamplingPosterior,
@@ -24,6 +24,9 @@ from sbi.inference.posteriors.posterior_parameters import MCMCPosteriorParameter
 from sbi.inference.potentials.base_potential import (
     BasePotential,
     CustomPotentialWrapper,
+)
+from sbi.inference.potentials.likelihood_based_potential import (
+    LikelihoodBasedPotential,
 )
 from sbi.inference.potentials.posterior_based_potential import (
     PosteriorBasedPotential,
@@ -201,6 +204,43 @@ def _build_potential(potential_type: str, x_o: Tensor | None = None) -> BasePote
     return VectorFieldBasedPotential(posterior_score_nn()(theta, x), prior, x_o=x_o)
 
 
+def test_potential_with_1d_prior_gives_one_value_per_theta():
+    """Test the potential for a 1-D prior with batch shape (1,).
+
+    Its log prob has shape (N, 1). Added to the (N,) log likelihood, it would
+    broadcast to (N, N).
+    """
+    theta, x = torch.randn(20, 1), torch.randn(20, 2)
+    prior = Normal(zeros(1), ones(1))
+    independent_prior = Independent(Normal(zeros(1), ones(1)), 1)
+
+    estimator = likelihood_nn("mdn")(theta, x)
+    potential = LikelihoodBasedPotential(estimator, prior, x_o=zeros(1, 2))
+    reference = LikelihoodBasedPotential(estimator, independent_prior, x_o=zeros(1, 2))
+
+    test_theta = torch.randn(3, 1)
+    values = potential(test_theta)
+    assert values.shape == (3,)
+    assert torch.allclose(values, reference(test_theta))
+
+
+def test_vector_field_potential_keeps_exact_formulas_for_1d_prior():
+    """Test that the stored 1-D prior keeps the exact marginal prior.
+
+    The iid and guidance methods choose exact prior formulas by the prior's type and
+    fall back to a fitted Gaussian mixture for types they do not know.
+    """
+    theta, x = torch.randn(20, 1), torch.randn(20, 2)
+    prior = Normal(zeros(1), ones(1))
+    potential = VectorFieldBasedPotential(posterior_score_nn()(theta, x), prior)
+
+    m, s = torch.tensor(0.7), torch.tensor(0.5)
+    test_theta = torch.randn(3, 1)
+    marginal = marginalize(potential.prior, m, s).log_prob(test_theta)
+    exact = marginalize(prior, m, s).log_prob(test_theta).sum(-1)
+    assert torch.allclose(marginal, exact)
+
+
 @pytest.mark.parametrize("potential_type", ("posterior", "vector_field"))
 def test_bind_preserves_estimator(potential_type: str):
     """Test that bind() returns a potential holding the same estimator object.
@@ -357,3 +397,37 @@ def test_potential_rejects_x_of_another_shape(estimator: str):
     assert potential_fn.bind(zeros(3)).x_o.shape == (1, 3)
     with pytest.raises(ValueError, match=r"x has shape \(2, 4\), but one observation"):
         potential_fn.bind(zeros(2, 4))
+
+
+@pytest.mark.parametrize("estimator", ("likelihood", "ratio"))
+def test_potential_pairs_one_observation_with_every_theta(estimator: str):
+    """Without iid trials, one observation pairs with every theta, as for NPE, and
+    gives the iid potential of that observation."""
+    prior = BoxUniform(-ones(2), ones(2))
+    theta, x = prior.sample((10,)), torch.randn(10, 3)
+    if estimator == "likelihood":
+        net = likelihood_nn("mdn")(theta, x)
+        potential_fn, _ = likelihood_estimator_based_potential(net, prior, None)
+    else:
+        net = classifier_nn("mlp")(theta, x)
+        potential_fn, _ = ratio_estimator_based_potential(net, prior, None)
+
+    theta_o = prior.sample((4,))
+    paired = potential_fn.bind(x[:1], x_is_iid=False)(theta_o, track_gradients=False)
+    iid = potential_fn.bind(x[:1], x_is_iid=True)(theta_o, track_gradients=False)
+    assert paired.shape == (4,)
+    assert torch.allclose(paired, iid)
+
+
+def test_posterior_rejects_theta_of_another_width():
+    """A theta with fewer entries than the prior has parameters used to broadcast and
+    return values without an error."""
+    prior = BoxUniform(-ones(2), ones(2))
+    theta, x = prior.sample((10,)), torch.randn(10, 3)
+    net = likelihood_nn("maf")(theta, x)
+    potential_fn, _ = likelihood_estimator_based_potential(net, prior, None)
+    posterior = ImportanceSamplingPosterior(potential_fn, proposal=prior)
+
+    match = r"theta has shape \(4, 1\), but the prior has 2 parameter"
+    with pytest.raises(ValueError, match=match):
+        posterior.potential(zeros(4, 1), x=zeros(1, 3))

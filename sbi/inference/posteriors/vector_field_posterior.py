@@ -31,7 +31,6 @@ from sbi.utils.sbiutils import (
     warn_if_outside_prior_support,
     within_support,
 )
-from sbi.utils.torchutils import ensure_theta_batched
 
 
 class VectorFieldPosterior(NeuralPosterior):
@@ -505,7 +504,7 @@ class VectorFieldPosterior(NeuralPosterior):
             x, x_is_iid=is_iid, **(ode_kwargs or {})
         )
 
-        theta = ensure_theta_batched(torch.as_tensor(theta))
+        theta = self._theta_batched(theta)
         log_prob = self.potential_fn(
             theta.to(self._device),
             track_gradients=track_gradients,

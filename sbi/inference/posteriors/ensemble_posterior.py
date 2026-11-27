@@ -474,7 +474,7 @@ class EnsemblePosterior(NeuralPosterior):
         """
         self._bind_mixture(x, "potential")
 
-        theta = ensure_theta_batched(torch.as_tensor(theta))
+        theta = self._theta_batched(theta)
 
         return self.potential_fn(
             theta.to(self._device), track_gradients=track_gradients

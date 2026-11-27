@@ -53,6 +53,36 @@ def check_prior(prior: Any) -> None:
         lists of independent priors."""
 
 
+def maybe_wrap_batched_1d_prior(
+    prior: Optional[Distribution],
+) -> Optional[Distribution]:
+    """Return the prior such that its log prob has one value per sample.
+
+    A 1-D prior with batch shape (1,), e.g. `Normal(zeros(1), ones(1))`, returns log
+    probs of shape (N, 1). Added to a log likelihood of shape (N,), they would
+    broadcast to (N, N). `Independent` makes the batch dimension an event dimension
+    and keeps the base distribution visible to code that chooses a formula by type.
+
+    Args:
+        prior: Prior distribution, or None.
+
+    Returns:
+        `Independent(prior, 1)` if the prior has batch shape (1,) and no event shape,
+        else the prior unchanged.
+    """
+    # `OneDimPriorWrapper` declares batch shape (1,) but returns one value per sample.
+    # A prior with an event shape already returns one value per row of flat (N, D)
+    # parameters; `Independent` would sum over the rows.
+    if (
+        isinstance(prior, Distribution)
+        and not isinstance(prior, OneDimPriorWrapper)
+        and prior.batch_shape == torch.Size([1])
+        and prior.event_shape == torch.Size([])
+    ):
+        return Independent(prior, 1)
+    return prior
+
+
 def process_prior(
     prior: Union[Sequence[Distribution], Distribution, CustomPrior],
     custom_prior_wrapper_kwargs: Optional[Dict] = None,

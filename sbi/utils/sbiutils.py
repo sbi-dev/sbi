@@ -421,37 +421,69 @@ def z_standardization(
             avoid division by zero.
 
     Returns:
-        Mean and standard deviation for z-scoring
+        Mean and standard deviation for z-scoring. From a single valid row, the
+        mean is that row and the std is one, so a net built from one row can load
+        trained weights.
     """
     is_valid_t, *_ = handle_invalid_x(batch_t, True)
+    valid_t = batch_t[is_valid_t]
+
+    # Structured data gets a single mean over all dimensions, equivalent to the mean
+    # over per-sample means.
+    t_mean = torch.mean(valid_t) if structured_dims else torch.mean(valid_t, dim=0)
+
+    if len(valid_t) == 1:
+        warnings.warn(
+            "z-scoring from a single valid row: the mean is that row and the std is "
+            "one, which does not represent your data. This is only useful to rebuild "
+            "a net and then load trained weights with `load_state_dict()`. To train, "
+            "pass more than one valid row. To save and load a whole trainer or "
+            "posterior, use their `save()` and `load()` methods.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return t_mean, torch.ones_like(t_mean)
 
     if structured_dims:
-        # Structured data so compute a single mean over all dimensions
-        # equivalent to taking mean over per-sample mean, i.e.,
-        # `torch.mean(torch.mean(.., dim=1))`.
-        t_mean = torch.mean(batch_t[is_valid_t])
         # Compute std per-sample first, over all of its dimensions.
-        sample_std = torch.std(batch_t[is_valid_t].flatten(start_dim=1), dim=1)
+        sample_std = torch.std(valid_t.flatten(start_dim=1), dim=1)
         sample_std[sample_std < min_std] = min_std
         # Average over all samples for batch std.
         t_std = torch.mean(sample_std)
     else:
-        t_mean = torch.mean(batch_t[is_valid_t], dim=0)
-        t_std = torch.std(batch_t[is_valid_t], dim=0)
+        t_std = torch.std(valid_t, dim=0)
         t_std[t_std < min_std] = min_std
 
-    # Return mean and std for z-scoring.
     return t_mean, t_std
 
 
-class Standardize(nn.Module):
+class _MeanStdBuffers(nn.Module):
+    """Holds `mean` and `std` as buffers, so `.to()` moves and casts them."""
+
     def __init__(self, mean: Union[Tensor, float], std: Union[Tensor, float]):
-        super(Standardize, self).__init__()
+        super().__init__()
         mean, std = map(torch.as_tensor, (mean, std))
-        self.mean = mean
-        self.std = std
         self.register_buffer("_mean", mean)
         self.register_buffer("_std", std)
+
+    @property
+    def mean(self) -> Tensor:
+        return self._mean
+
+    @property
+    def std(self) -> Tensor:
+        return self._std
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        # Older pickles carry plain `mean`/`std` attributes; drop them so only the
+        # buffers remain.
+        state.pop("mean", None)
+        state.pop("std", None)
+        super().__setstate__(state)
+
+
+class Standardize(_MeanStdBuffers):
+    """Z-scores its input: `(input - mean) / std`."""
 
     def forward(self, tensor):
         return (tensor - self._mean) / self._std
@@ -491,35 +523,7 @@ def standardizing_net(
         Neural network module for z-scoring
     """
 
-    is_valid_t, *_ = handle_invalid_x(batch_t, True)
-
-    if structured_dims:
-        # Structured data so compute a single mean over all dimensions
-        # equivalent to taking mean over per-sample mean, i.e.,
-        # `torch.mean(torch.mean(.., dim=1))`.
-        t_mean = torch.mean(batch_t[is_valid_t])
-    else:
-        # Compute per-dimension (independent) mean.
-        t_mean = torch.mean(batch_t[is_valid_t], dim=0)
-
-    if len(batch_t) > 1:
-        if structured_dims:
-            # Compute std per-sample first, over all of its dimensions.
-            sample_std = torch.std(batch_t[is_valid_t].flatten(start_dim=1), dim=1)
-            sample_std[sample_std < min_std] = min_std
-            # Average over all samples for batch std.
-            t_std = torch.mean(sample_std)
-        else:
-            t_std = torch.std(batch_t[is_valid_t], dim=0)
-            t_std[t_std < min_std] = min_std
-    else:
-        t_std = torch.ones(1)
-        logger.warning(
-            """Using a one-dimensional batch will instantiate a Standardize transform
-            with (mean, std) parameters which are not representative of the data. We
-            allow this behavior because you might be loading a pre-trained net.
-            If this is not the case, please be sure to use a larger batch."""
-        )
+    t_mean, t_std = z_standardization(batch_t, structured_dims, min_std)
 
     nan_in_stats = torch.logical_or(torch.isnan(t_mean).any(), torch.isnan(t_std).any())
     assert not nan_in_stats, """Training data mean or std for standardizing net must not
@@ -1442,7 +1446,14 @@ def gradient_ascent(
 
 
 def seed_all_backends(seed: Optional[Union[int, Tensor]] = None) -> None:
-    """Sets all python, numpy and pytorch seeds."""
+    """Seeds the global random states of Python, numpy and PyTorch.
+
+    It also makes cuDNN use deterministic convolution algorithms for the rest of the
+    session, which can slow down convolutions on a GPU.
+
+    Args:
+        seed: Seed for all random states. If None, it is drawn from PyTorch's.
+    """
 
     # Cast Tensor to int (required by math.random since Python 3.11)
     seed = int(torch.randint(1000000, size=(1,))) if seed is None else int(seed)

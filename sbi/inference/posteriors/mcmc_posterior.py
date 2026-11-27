@@ -29,7 +29,6 @@ from sbi.utils import mcmc_transform
 from sbi.utils.pbar import progress_disabled, sampling_desc, tqdm
 from sbi.utils.potentialutils import pyro_potential_wrapper, transformed_potential
 from sbi.utils.torchutils import (
-    ensure_theta_batched,
     tensor2numpy,
 )
 from sbi.utils.typechecks import validate_target_accept
@@ -222,7 +221,7 @@ class MCMCPosterior(NeuralPosterior):
         x = self._x_else_default_x(x)
         self.potential_fn = self._bind_iid(x)
 
-        theta = ensure_theta_batched(torch.as_tensor(theta))
+        theta = self._theta_batched(theta)
         return self.potential_fn(
             theta.to(self._device), track_gradients=track_gradients
         )

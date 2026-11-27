@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from functools import lru_cache
 from typing import Optional, Tuple, Union
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 from sklearn.mixture import GaussianMixture
@@ -660,8 +661,14 @@ def marginalize_empirical(
 
 
 # Special distributions:
+_GAUSS_LEGENDRE = np.polynomial.legendre.leggauss(32)
+
+
 class UniformNormalPosterior(Distribution):
     """Posterior distribution for a uniform prior and normal likelihood.
+
+    Only the mean and the variance are implemented: the iid score corrections
+    use nothing else.
 
     Args:
         low: Lower bound of the uniform distribution.
@@ -701,19 +708,30 @@ class UniformNormalPosterior(Distribution):
         self.mu = self.x_t / self.m
         self.sigma = self.s / torch.abs(self.m)
 
-        # Standard Normal Distribution
-        self.standard_normal = Normal(
-            torch.tensor(0.0, device=self.sigma.device), 1.0, validate_args=False
+        # In standard units the box is [alpha, beta]; c is its point closest to the
+        # mode.
+        alpha = (self.low - self.mu) / self.sigma
+        beta = (self.high - self.mu) / self.sigma
+        c = torch.maximum(alpha, beta.clamp(max=0))
+
+        # Moments of y = z - c by quadrature: the density of y is proportional to
+        # exp(-c y - y**2 / 2) <= 1, so no terms of order c**2 cancel, and beyond
+        # `reach` it is below exp(-32) of its peak.
+        reach = 64 / (torch.sqrt(c**2 + 64) + c.abs())
+        y_lo = (alpha - c).clamp(min=-reach)
+        y_hi = (beta - c).clamp(max=reach)
+        nodes, weights = (
+            torch.as_tensor(t, dtype=y_lo.dtype, device=y_lo.device)
+            for t in _GAUSS_LEGENDRE
         )
-
-        # Standardized truncation limits
-        self.alpha = (self.low - self.mu) / self.sigma
-        self.beta = (self.high - self.mu) / self.sigma
-
-        # Compute normalization constant Z
-        self.a = self.standard_normal.cdf(self.alpha)
-        self.b = self.standard_normal.cdf(self.beta)
-        self.Z = torch.clamp(self.b - self.a, min=1e-8)  # Avoid division by zero
+        half = ((y_hi - y_lo) / 2).unsqueeze(-1)
+        y = y_lo.unsqueeze(-1) + half * (nodes + 1)
+        density = weights * torch.exp(-c.unsqueeze(-1) * y - y**2 / 2)
+        prob = density / density.sum(-1, keepdim=True)
+        mean_y = (prob * y).sum(-1)
+        var_y = (prob * (y - mean_y.unsqueeze(-1)) ** 2).sum(-1)
+        self._mean = self.mu + self.sigma * (c + mean_y)
+        self._variance = self.sigma**2 * var_y
 
         batch_shape = torch.broadcast_shapes(
             self.low.shape, self.high.shape, self.m.shape, self.s.shape, self.x_t.shape
@@ -723,36 +741,11 @@ class UniformNormalPosterior(Distribution):
 
     @property
     def mean(self) -> Tensor:
-        # Standard normal pdf values
-        phi_alpha = torch.exp(self.standard_normal.log_prob(self.alpha))
-        phi_beta = torch.exp(self.standard_normal.log_prob(self.beta))
-
-        return self.mu + self.sigma * (phi_alpha - phi_beta) / self.Z
+        return self._mean
 
     @property
     def variance(self) -> Tensor:
-        phi_alpha = torch.exp(self.standard_normal.log_prob(self.alpha))
-        phi_beta = torch.exp(self.standard_normal.log_prob(self.beta))
-
-        term = (phi_alpha - phi_beta) / self.Z
-        variance_adjustment = (
-            1 + (self.alpha * phi_alpha - self.beta * phi_beta) / self.Z - term**2
-        )
-
-        return self.sigma**2 * variance_adjustment
-
-    def sample(self, sample_shape: torch.Size = torch.Size()) -> Tensor:
-        # Inverse CDF sampling for a truncated normal
-        u = torch.rand(sample_shape, device=self.low.device) * self.Z + self.a
-        sample = self.mu + self.sigma * self.standard_normal.icdf(
-            u
-        )  # Using icdf for stability
-        return torch.clamp(sample, min=self.low, max=self.high)
-
-    def log_prob(self, x: Tensor) -> Tensor:
-        normal = Normal(self.mu, self.sigma, validate_args=False)
-        lp = normal.log_prob(x) - torch.log(self.Z)
-        return torch.where((x >= self.low) & (x <= self.high), lp, -torch.inf)
+        return self._variance
 
 
 class UniformNormalConvolution(Distribution):
@@ -789,9 +782,9 @@ class UniformNormalConvolution(Distribution):
         self.scale = torch.as_tensor(scale)
         self.noise = torch.as_tensor(noise)
 
-        # Determine batch_shape from broadcasting low and high (assumes low/high
-        # are tensors or scalars)
-        batch_shape = self.low.shape
+        batch_shape = torch.broadcast_shapes(
+            self.low.shape, self.high.shape, self.scale.shape, self.noise.shape
+        )
 
         event_shape = torch.Size()
         super().__init__(batch_shape, event_shape, validate_args=validate_args)

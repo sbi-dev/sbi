@@ -12,7 +12,7 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.importance.importance_sampling import importance_sample
 from sbi.samplers.importance.sir import sampling_importance_resampling
 from sbi.sbi_types import Proposal, Shape, TorchTransform
-from sbi.utils.torchutils import ensure_theta_batched, move_tensors
+from sbi.utils.torchutils import move_tensors
 
 
 class ImportanceSamplingPosterior(NeuralPosterior):
@@ -113,7 +113,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         x = self._x_else_default_x(x)
         self.potential_fn = self._bind_iid(x)
 
-        theta = ensure_theta_batched(torch.as_tensor(theta))
+        theta = self._theta_batched(theta)
 
         with torch.set_grad_enabled(track_gradients):
             potential_values = self.potential_fn(

@@ -10,7 +10,7 @@ from torch import Tensor, nn
 from torch.distributions import Distribution
 
 from sbi.utils.torchutils import process_device
-from sbi.utils.user_input_checks import process_x
+from sbi.utils.user_input_checks import maybe_wrap_batched_1d_prior, process_x
 from sbi.utils.user_input_checks_utils import move_distribution_to_device
 
 
@@ -26,12 +26,13 @@ class BasePotential(metaclass=ABCMeta):
         This parent class takes care of setting `x_o`.
 
         Args:
-            prior: Prior distribution.
+            prior: Prior distribution. A 1-D prior with batch shape (1,) is stored as
+                `Independent(prior, 1)`, so that its log prob has one value per sample.
             x_o: Observed data.
             device: Device on which to evaluate the potential function.
         """
         self.device = process_device(device)
-        self.prior = prior
+        self.prior = maybe_wrap_batched_1d_prior(prior)
         self._x_o = self._prepare_x_o(x_o)
         self._x_is_iid = True
 
@@ -184,7 +185,8 @@ def unpaired_batch_error(num_theta: int, num_x: int) -> ValueError:
     observations = "observation" if num_x == 1 else "observations"
     return ValueError(
         f"theta has {num_theta} rows and x has {num_x} {observations}. Without iid "
-        "trials, each theta pairs with one observation, so the numbers must match. "
+        "trials, each theta pairs with one observation, so x needs one observation "
+        "or as many as theta has rows. "
         "To combine the observations as iid trials of one theta, bind x with "
         "`x_is_iid=True`."
     )

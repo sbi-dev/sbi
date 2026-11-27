@@ -9,6 +9,7 @@ from torch.distributions import Distribution
 from torch.utils.tensorboard.writer import SummaryWriter
 
 import sbi.utils as utils
+from sbi.inference.trainers._contracts import StartIndexContext
 from sbi.inference.trainers.npe.npe_base import (
     PosteriorEstimatorTrainer,
 )
@@ -33,6 +34,10 @@ class NPE_B(PosteriorEstimatorTrainer):
 
     For single-round inference, NPE-A, NPE-B, and NPE-C are equivalent and use
     plain NLL loss.
+
+    In multi-round inference, invalid simulations that the first round discards make
+    the posterior somewhat too wide. To avoid this, pass `discard_prior_samples=True`
+    to `train()` in later rounds.
 
     [1] *Flexible statistical inference for mechanistic models of neural
         dynamics*, Lueckmann, Gonçalves et al., NeurIPS 2017.
@@ -110,6 +115,11 @@ class NPE_B(PosteriorEstimatorTrainer):
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
 
+    def _get_start_index(self, context: StartIndexContext) -> int:
+        """Return the start index, and keep it: the loss mixes only the appends used."""
+        self._start_idx = super()._get_start_index(context)
+        return self._start_idx
+
     def _log_prob_proposal_posterior(
         self,
         theta: Tensor,
@@ -134,44 +144,45 @@ class NPE_B(PosteriorEstimatorTrainer):
         # Evaluate prior
         # we accept prior log prob to be -Inf at theta
         # meaning that theta is out of the prior range (the weight is thus 0)
+        # A 1-D prior or proposal without `Independent` returns shape (N, 1).
+        num_theta = theta.shape[0]
+        log_prior = self._prior.log_prob(theta).reshape(num_theta)
         utils.assert_not_nan_or_plus_inf(
-            self._prior.log_prob(theta), "prior log probs of proposal samples"
+            log_prior, "prior log probs of proposal samples"
         )
-        prior = torch.exp(self._prior.log_prob(theta))
 
         # Evaluate proposal
-        # (as theta comes from prior and proposal from previous rounds,
-        # the last proposal is actually a mixture of the prior
-        # and of all the previous proposals with coefficients representing
-        # the proportion of the new theta added at each round)
-        prop = torch.zeros(self._round + 1, device=theta.device)
-        nb_samples = 0  # total number of theta from all the rounds
-
-        for k in range(self._round + 1):
-            nb_samples += self._theta_roundwise[k].size(0)
-            # the number of new theta sampled in the round k
-            prop[k] = self._theta_roundwise[k].size(0)
-
-        prop /= nb_samples
-        log_prop = torch.log(prop).repeat(theta.size(0), 1)
+        # (the training set is a mixture of the proposals of the appends it uses,
+        # each weighted by its number of samples; `None` stands for the prior)
+        appends = [
+            (theta_k.size(0), self._prior if density is None else density)
+            for theta_k, density, round_k in zip(
+                self._theta_roundwise,
+                self._proposal_roundwise,
+                self._data_round_index,
+                strict=True,
+            )
+            if round_k >= self._start_idx
+        ]
+        prop = torch.tensor([n for n, _ in appends], device=theta.device)
+        log_prop = torch.log(prop / prop.sum()).repeat(theta.size(0), 1)
 
         log_previous_proposals = torch.zeros(
-            (theta.size(0), self._round + 1), device=theta.device
+            (theta.size(0), len(appends)), device=theta.device
         )
-        for k, density in enumerate(self._proposal_roundwise):
+        for k, (_, density) in enumerate(appends):
             # we accept the k th proposal log prob to be -Inf at theta
             # meaning that theta is out of the k th proposal range
-            log_previous_proposals[:, k] = density.log_prob(theta)
+            log_previous_proposals[:, k] = density.log_prob(theta).reshape(num_theta)
             utils.assert_not_nan_or_plus_inf(
                 log_previous_proposals[:, k], "proposal log probs of proposal samples"
             )
 
         log_proposal = torch.logsumexp(log_prop + log_previous_proposals, dim=1)
-        proposal = torch.exp(log_proposal)
 
-        # Construct the importance weights and normalize them
-        importance_weights = prior / proposal
-        importance_weights /= importance_weights.sum()
+        # Normalized importance weights, in log space: exp() of a log prob underflows
+        # to 0 in float32 for high-dimensional theta
+        importance_weights = torch.softmax(log_prior - log_proposal, dim=0)
 
         theta = reshape_to_sample_batch_event(theta, theta.shape[1:])
         # Reshape the density estimator log probs

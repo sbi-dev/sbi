@@ -304,6 +304,16 @@ def test_log_prob_broadcasting_batch_dims(
     assert log_probs.shape == (2, batch_dim)
 
 
+@pytest.mark.parametrize("density_estimator_build_fn", [build_nsf, build_zuko_nsf])
+def test_log_prob_rejects_input_of_another_width(density_estimator_build_fn):
+    """An input of width 1 must not be broadcast to the event shape."""
+    density_estimator, _, condition, _ = _build_density_estimator_and_tensors(
+        density_estimator_build_fn, (2,), (3,), batch_dim=4
+    )
+    with pytest.raises(ValueError, match="Shape of input"):
+        density_estimator.log_prob(torch.zeros(4, 1), condition=condition)
+
+
 @pytest.mark.parametrize(
     "density_estimator_build_fn",
     [build_nsf, build_zuko_nsf],
@@ -855,3 +865,19 @@ def test_context_spline_map_hidden_layers_have_their_own_weights():
     linears = [m for m in net.spline_predictor if isinstance(m, torch.nn.Linear)]
 
     assert len({id(m) for m in linears}) == len(linears) == 5
+
+
+@pytest.mark.parametrize("build_fn", [build_maf, build_nsf, build_zuko_maf])
+def test_inverse_transform_maps_samples_to_the_base_distribution(build_fn):
+    """inverse_transform must embed (z-score) the condition, as sample() does."""
+    theta = torch.randn(500, 2)
+    x = 100.0 + 10.0 * torch.randn(500, 2)
+    estimator = build_fn(theta, x, z_score_y="independent")
+    x_o = x[:1]
+
+    with torch.no_grad():
+        samples = estimator.sample((2000,), condition=x_o)[:, 0]
+        noise = estimator.inverse_transform(samples, x_o)
+
+    assert torch.allclose(noise.mean(0), torch.zeros(2), atol=0.15)
+    assert torch.allclose(noise.std(0), torch.ones(2), atol=0.15)
