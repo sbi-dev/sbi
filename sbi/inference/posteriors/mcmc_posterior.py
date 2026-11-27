@@ -139,7 +139,7 @@ class MCMCPosterior(NeuralPosterior):
 
         self._purpose = (
             "It provides MCMC to .sample() from the posterior and "
-            "can evaluate the _unnormalized_ posterior density with .log_prob()."
+            "can evaluate the _unnormalized_ posterior density with .potential()."
         )
 
     def to(self, device: Union[str, torch.device]) -> Self:

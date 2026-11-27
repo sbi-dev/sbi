@@ -223,8 +223,8 @@ class MNLE(LikelihoodEstimatorTrainer):
                 - `ImportanceSamplingPosteriorParameters`
 
         Returns:
-            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
-            (the returned log-probability is unnormalized).
+            Posterior $p(\theta|x)$  with `.sample()` and `.potential()` methods
+            (the potential is the unnormalized log-probability).
         """
         if density_estimator is not None:
             assert isinstance(

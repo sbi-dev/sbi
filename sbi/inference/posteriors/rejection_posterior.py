@@ -63,7 +63,7 @@ class RejectionPosterior(NeuralPosterior):
 
         self._purpose = (
             "It provides rejection sampling to .sample() from the posterior and "
-            "can evaluate the _unnormalized_ posterior density with .log_prob()."
+            "can evaluate the _unnormalized_ posterior density with .potential()."
         )
 
     def log_prob(
