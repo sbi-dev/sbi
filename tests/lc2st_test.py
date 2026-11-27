@@ -216,19 +216,6 @@ def test_lc2st_get_scores_returns_dataclass(lc2st_instance, theta_o, x_o):
     assert result.probabilities is not None
 
 
-def test_lc2st_get_scores_deprecated_return_probs(lc2st_instance, theta_o, x_o):
-    """Test that return_probs=True emits deprecation warning."""
-    lc2st_instance.train_on_observed_data()
-    with pytest.warns(FutureWarning, match="return_probs"):
-        probs, scores = lc2st_instance.get_scores(
-            theta_o=theta_o,
-            x_o=x_o,
-            trained_clfs=lc2st_instance.trained_clfs,
-            return_probs=True,
-        )
-    assert probs is not None and scores is not None
-
-
 # =============================================================================
 # State Machine Tests
 # =============================================================================
@@ -550,38 +537,6 @@ def test_lc2st_null_training_requires_permutation_or_distribution(cal_data):
     )
     with pytest.raises(ValueError, match="null_distribution"):
         lc2st.train_under_null_hypothesis()
-
-
-# =============================================================================
-# Deprecation Tests
-# =============================================================================
-
-
-def test_lc2st_thetas_parameter_deprecated(cal_data):
-    """Test that 'thetas' parameter emits FutureWarning."""
-    with pytest.warns(FutureWarning, match="thetas.*deprecated"):
-        lc2st = LC2ST(
-            thetas=cal_data.thetas,
-            xs=cal_data.xs,
-            posterior_samples=cal_data.posterior_samples,
-        )
-    assert lc2st.theta_q is not None
-
-
-def test_lc2st_both_thetas_and_prior_samples_error(cal_data):
-    """Test that specifying both thetas and prior_samples raises ValueError."""
-    # The deprecated `thetas` branch emits a FutureWarning before the
-    # ValueError fires; suppress it so the test output stays clean.
-    with (
-        pytest.warns(FutureWarning, match="thetas.*deprecated"),
-        pytest.raises(ValueError, match="Cannot specify both"),
-    ):
-        LC2ST(
-            prior_samples=cal_data.thetas,
-            thetas=cal_data.thetas,
-            xs=cal_data.xs,
-            posterior_samples=cal_data.posterior_samples,
-        )
 
 
 # =============================================================================

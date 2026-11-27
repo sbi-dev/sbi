@@ -126,8 +126,6 @@ class LC2ST:
         num_trials_null: int = 100,
         permutation: bool = True,
         device: str = "cpu",
-        *,
-        thetas: Optional[Tensor] = None,  # Deprecated, use prior_samples
     ) -> None:
         """Initialize L-C2ST.
 
@@ -163,27 +161,11 @@ class LC2ST:
             device: The device to use for training the classifier, e.g., "cpu" or
                 "cuda" or "mps". Defaults to "cpu". GPU support is only available for
                 the MLP classifier.
-            thetas: Deprecated. Use prior_samples instead.
 
         References:
         [1] : https://arxiv.org/abs/2306.03580, https://github.com/JuliaLinhart/lc2st
         [2] : https://github.com/sbi-dev/sbi/blob/main/sbi/utils/metrics.py
         """
-        # Handle deprecated 'thetas' parameter
-        if thetas is not None:
-            warnings.warn(
-                "Parameter 'thetas' is deprecated and will be removed in a future "
-                "version. Use 'prior_samples' instead.",
-                FutureWarning,
-                stacklevel=2,
-            )
-            if prior_samples is not None:
-                raise ValueError(
-                    "Cannot specify both 'thetas' and 'prior_samples'. "
-                    "Use 'prior_samples' only."
-                )
-            prior_samples = thetas
-
         # Validate required arguments
         if prior_samples is None:
             raise ValueError("prior_samples is required.")
@@ -550,8 +532,7 @@ class LC2ST:
         theta_o: Tensor,
         x_o: Tensor,
         trained_clfs: List[BaseEstimator],
-        return_probs: bool = False,
-    ) -> Union[LC2STScores, Tuple[np.ndarray, np.ndarray]]:
+    ) -> LC2STScores:
         """Computes the L-C2ST scores given the trained classifiers.
 
         Mean squared error (MSE) between 0.5 and the predicted probabilities
@@ -562,14 +543,9 @@ class LC2ST:
                 of shape (sample_size, dim).
             x_o: The observation, of shape (,dim_x).
             trained_clfs: List of trained classifiers, of length `num_folds`.
-            return_probs: Whether to return the predicted probabilities of being in P,
-                defaults to False. Deprecated: Use the LC2STScores.probabilities
-                attribute instead.
 
         Returns:
-            LC2STScores object containing scores and optionally probabilities.
-            For backward compatibility, if return_probs=True, returns a tuple
-            (probs, scores) instead.
+            LC2STScores object containing the scores and the predicted probabilities.
         """
         if x_o.shape == self.x_p_mean.shape:
             x_o = x_o.unsqueeze(0)
@@ -587,19 +563,6 @@ class LC2ST:
             scores_list.append(score)
         probs_arr, scores_arr = np.array(probs_list), np.array(scores_list)
 
-        # Backward compatibility: return tuple if return_probs=True
-        if return_probs:
-            warnings.warn(
-                "The 'return_probs' parameter is deprecated and will be "
-                "removed in a future release. It returns a (probs, scores) "
-                "tuple; use LC2STScores.probabilities and LC2STScores.scores "
-                "from the default return value instead.",
-                FutureWarning,
-                stacklevel=2,
-            )
-            return probs_arr, scores_arr
-
-        # Return structured object
         return LC2STScores(scores=scores_arr, probabilities=probs_arr)
 
     def train_on_observed_data(
@@ -686,7 +649,6 @@ class LC2ST:
             x_o=x_o,
             trained_clfs=self.trained_clfs,  # type: ignore[arg-type]
         )
-        assert isinstance(result, LC2STScores)  # return_probs=False returns LC2STScores
         return float(result.scores.mean())
 
     def p_value(
@@ -728,7 +690,6 @@ class LC2ST:
         stats_null = self.get_statistics_under_null_hypothesis(
             theta_o=theta_o, x_o=x_o, verbosity=0
         )
-        assert isinstance(stats_null, LC2STScores)
         num_extreme = (stat_data <= stats_null.scores).sum()
         return float((1 + num_extreme) / (1 + len(stats_null.scores)))
 
@@ -818,23 +779,19 @@ class LC2ST:
         self,
         theta_o: Tensor,
         x_o: Tensor,
-        return_probs: bool = False,
+        *,
         verbosity: int = 0,
-    ) -> Union[LC2STScores, Tuple[np.ndarray, np.ndarray]]:
+    ) -> LC2STScores:
         """Computes the L-C2ST scores under the null hypothesis.
 
         Args:
             theta_o: Samples from the posterior conditioned on the observation `x_o`,
                 of shape (sample_size, dim).
             x_o: The observation, of shape (, dim_x).
-            return_probs: Whether to return the predicted probabilities of being in P,
-                defaults to False.
             verbosity: Verbosity level, defaults to 0.
 
         Returns:
             LC2STScores object containing null statistics and probabilities.
-            For backward compatibility, if return_probs=True, returns a tuple
-            (probs, scores) instead.
 
         Raises:
             RuntimeError: If classifiers have not been trained under null hypothesis.
@@ -874,22 +831,10 @@ class LC2ST:
             # Evaluate using LC2STScores (normalization is handled in get_scores)
             clf_t = self.trained_clfs_null[t]
             result = self.get_scores(theta_o=theta_o_t, x_o=x_o, trained_clfs=clf_t)
-            assert isinstance(result, LC2STScores)
             probs_null.append(result.probabilities)
             stats_null.append(result.scores.mean())
 
         probs_null_arr, stats_null_arr = np.array(probs_null), np.array(stats_null)
-
-        if return_probs:
-            warnings.warn(
-                "The 'return_probs' parameter is deprecated and will be "
-                "removed in a future release. It returns a (probs, scores) "
-                "tuple; use LC2STScores.probabilities and LC2STScores.scores "
-                "from the default return value instead.",
-                FutureWarning,
-                stacklevel=2,
-            )
-            return probs_null_arr, stats_null_arr
 
         return LC2STScores(scores=stats_null_arr, probabilities=probs_null_arr)
 
@@ -904,8 +849,6 @@ class LC2ST_NF(LC2ST):
         flow_base_dist: Optional[torch.distributions.Distribution] = None,
         num_eval: int = 10_000,
         trained_clfs_null: Optional[Dict[int, List[BaseEstimator]]] = None,
-        *,
-        thetas: Optional[Tensor] = None,  # Deprecated, use prior_samples
         **kwargs: Any,
     ) -> None:
         r"""L-C2ST for Normalizing Flows.
@@ -948,27 +891,11 @@ class LC2ST_NF(LC2ST):
             flow_base_dist: Base distribution of the normalizing flow.
             num_eval: Number of samples to evaluate the L-C2ST.
             trained_clfs_null: Pre-trained classifiers under the null.
-            thetas: Deprecated. Use prior_samples instead.
             kwargs: Additional arguments for the LC2ST class.
 
         References:
         [1] : https://arxiv.org/abs/2306.03580, https://github.com/JuliaLinhart/lc2st
         """
-        # Handle deprecated 'thetas' parameter
-        if thetas is not None:
-            warnings.warn(
-                "Parameter 'thetas' is deprecated and will be removed in a future "
-                "version. Use 'prior_samples' instead.",
-                FutureWarning,
-                stacklevel=2,
-            )
-            if prior_samples is not None:
-                raise ValueError(
-                    "Cannot specify both 'thetas' and 'prior_samples'. "
-                    "Use 'prior_samples' only."
-                )
-            prior_samples = thetas
-
         # Validate required arguments
         if prior_samples is None:
             raise ValueError("prior_samples is required.")
@@ -1013,27 +940,22 @@ class LC2ST_NF(LC2ST):
         self,
         x_o: Tensor,
         trained_clfs: List[BaseEstimator],
-        return_probs: bool = False,
         **kwargs: Any,
-    ) -> Union[LC2STScores, Tuple[np.ndarray, np.ndarray]]:
+    ) -> LC2STScores:
         """Computes the L-C2ST scores given the trained classifiers.
 
         Args:
             x_o: The observation, of shape (,dim_x).
             trained_clfs: Trained classifiers.
-            return_probs: Whether to return the predicted probabilities of being in P,
-                defaults to False.
             kwargs: Additional arguments used in the parent class.
 
         Returns:
-            LC2STScores object, or for backward compatibility with return_probs=True,
-            a tuple (probs, scores).
+            LC2STScores object containing the scores and the predicted probabilities.
         """
         return super().get_scores(
             theta_o=self.theta_o,
             x_o=x_o,
             trained_clfs=trained_clfs,
-            return_probs=return_probs,
         )
 
     def get_statistic_on_observed_data(
@@ -1119,24 +1041,21 @@ class LC2ST_NF(LC2ST):
     def get_statistics_under_null_hypothesis(
         self,
         x_o: Tensor,
-        return_probs: bool = False,
+        *,
         verbosity: int = 0,
         **kwargs: Any,
-    ) -> Union[LC2STScores, Tuple[np.ndarray, np.ndarray]]:
+    ) -> LC2STScores:
         """Computes the L-C2ST scores under the null hypothesis.
 
         Args:
             x_o: The observation.
                 Shape (, dim_x)
-            return_probs: Whether to return the predicted probabilities of being in P.
-                Defaults to False.
             verbosity: Verbosity level, defaults to 0.
             kwargs: Additional arguments used in the parent class.
         """
         return super().get_statistics_under_null_hypothesis(
             theta_o=self.theta_o,
             x_o=x_o,
-            return_probs=return_probs,
             verbosity=verbosity,
         )
 

@@ -13,6 +13,8 @@
   * All arguments after `vf_estimator`, including `device` and `NPSE`'s `sde_type`, can only be passed by keyword now.
 * **`FlowMatchingEstimator` no longer takes `num_freqs` or other unknown keyword arguments** ([#XXXX](https://github.com/sbi-dev/sbi/pull/XXXX)): `num_freqs` was deprecated in v0.25.0 ([#1544](https://github.com/sbi-dev/sbi/pull/1544)) and had no effect. An unknown keyword argument, including an `extra_kwargs` entry of `FlowMatchingConfig` that the estimator does not take, now raises a `TypeError` instead of being dropped silently.
 * **`plot_summary` no longer takes `inference` or `disable_tensorboard_prompt`** ([#XXXX](https://github.com/sbi-dev/sbi/pull/XXXX)): both were deprecated in v0.27.0 ([#1861](https://github.com/sbi-dev/sbi/pull/1861)). Use `trainer`, and `verbose=False` in place of `disable_tensorboard_prompt=True`. `trainer` is now a required argument.
+* **`LC2ST` and `LC2ST_NF` no longer take `thetas`, and their `get_scores()` and `get_statistics_under_null_hypothesis()` no longer take `return_probs`** ([#XXXX](https://github.com/sbi-dev/sbi/pull/XXXX)): both were deprecated in v0.27.0 ([#1727](https://github.com/sbi-dev/sbi/pull/1727)). Use `prior_samples`, and the `scores` and `probabilities` of the returned `LC2STScores`.
+  * `verbosity` of `get_statistics_under_null_hypothesis()` can only be passed by keyword now.
 
 ## v0.27.0
 
