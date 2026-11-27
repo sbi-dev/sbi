@@ -12,6 +12,7 @@ from typing import (
     Literal,
     Optional,
     Self,
+    Sequence,
     Union,
 )
 
@@ -132,7 +133,7 @@ class VIPosterior(NeuralPosterior):
         parameters: Optional[Iterable] = None,
         modules: Optional[Iterable] = None,
         num_transforms: int = 5,
-        hidden_features: int = 50,
+        hidden_features: Union[int, Sequence[int]] = 50,
         z_score_theta: Literal["none", "independent", "structured"] = "independent",
         z_score_x: Literal["none", "independent", "structured"] = "independent",
     ):
@@ -182,8 +183,10 @@ class VIPosterior(NeuralPosterior):
                 attribute.
             num_transforms: Number of transforms in the normalizing flow. Used for
                 both single-x VI (when q is a string flow type) and amortized VI.
-            hidden_features: Hidden layer size in flow networks. Used for both
-                single-x VI and amortized VI.
+            hidden_features: Hidden-layer widths of each transform's network (an
+                int gives two layers). Used for both single-x VI and amortized
+                VI. Single-x VI with `q="gf"` builds no such network and ignores
+                it.
             z_score_theta: Method for z-scoring θ (parameters). One of "none",
                 "independent", "structured". Used for both single-x VI and amortized
                 VI. Use "structured" for parameters with correlations.
@@ -224,7 +227,7 @@ class VIPosterior(NeuralPosterior):
         self._amortized_q: Optional[TransformedConditionalZukoFlow] = None
 
         self._num_transforms: int = num_transforms
-        self._hidden_features: int = hidden_features
+        self._hidden_features: Union[int, Sequence[int]] = hidden_features
         self._z_score_theta: Literal["none", "independent", "structured"] = (
             z_score_theta
         )
@@ -285,7 +288,7 @@ class VIPosterior(NeuralPosterior):
         self,
         flow_type: str,
         num_transforms: Optional[int] = None,
-        hidden_features: Optional[int] = None,
+        hidden_features: Optional[Union[int, Sequence[int]]] = None,
         z_score_theta: Optional[Literal["none", "independent", "structured"]] = None,
     ) -> TransformedZukoFlow:
         """Build a Zuko unconditional flow for variational inference.
@@ -299,8 +302,9 @@ class VIPosterior(NeuralPosterior):
             flow_type: Type of flow, one of ["maf", "nsf", "naf", "unaf", "nice",
                 "sospf", "gf"]. For "gaussian"/"gaussian_diag", use LearnableGaussian.
             num_transforms: Number of flow transforms. If None, uses instance default.
-            hidden_features: Number of hidden features per layer. If None, uses
-                instance default.
+            hidden_features: Hidden-layer widths of each transform's network (an
+                int gives two layers), ignored by "gf". If None, uses instance
+                default.
             z_score_theta: Method for z-scoring theta (parameters). One of
                 "independent", "structured", or "none". If None, uses instance default.
                 Use "structured" for parameters with correlations.
@@ -408,7 +412,7 @@ class VIPosterior(NeuralPosterior):
         x: Tensor,
         flow_type: Union[ZukoFlowType, str] = ZukoFlowType.NSF,
         num_transforms: int = 2,
-        hidden_features: int = 32,
+        hidden_features: Union[int, Sequence[int]] = 32,
         z_score_theta: Literal["none", "independent", "structured"] = "independent",
         z_score_x: Literal["none", "independent", "structured"] = "independent",
     ) -> TransformedConditionalZukoFlow:
@@ -419,7 +423,8 @@ class VIPosterior(NeuralPosterior):
             x: Sample of x values for z-scoring (batch_size, x_dim).
             flow_type: Type of flow. Can be a ZukoFlowType enum or string.
             num_transforms: Number of flow transforms.
-            hidden_features: Number of hidden features per layer.
+            hidden_features: Hidden-layer widths of each transform's network (an
+                int gives two layers).
             z_score_theta: Method for z-scoring θ (the parameters being modeled).
                 One of "none", "independent", "structured".
             z_score_x: Method for z-scoring x (the conditioning variable).
@@ -916,6 +921,9 @@ class VIPosterior(NeuralPosterior):
                 scheduler: A PyTorch learning rate scheduler. See
                     `DivergenceOptimizer` for details.
                 alpha: Only used if vi_method=`alpha`. Determines the alpha divergence.
+                    With a `RestrictedPrior` or a potential that is -inf inside the
+                    prior's support, use alpha < 1: for alpha >= 1 every step with
+                    a particle there rolls back.
                 K: Only used if vi_method=`IW`. Determines the number of importance
                     weighted particles.
                 stick_the_landing: If one should use the STL estimator (only for rKL,
@@ -1108,7 +1116,7 @@ class VIPosterior(NeuralPosterior):
         retrain_from_scratch: bool = False,
         flow_type: Optional[Union[ZukoFlowType, str]] = None,
         num_transforms: Optional[int] = None,
-        hidden_features: Optional[int] = None,
+        hidden_features: Optional[Union[int, Sequence[int]]] = None,
         z_score_theta: Optional[Literal["none", "independent", "structured"]] = None,
         z_score_x: Optional[Literal["none", "independent", "structured"]] = None,
         params: Optional["VIPosteriorParameters"] = None,
@@ -1142,8 +1150,9 @@ class VIPosterior(NeuralPosterior):
                 If None, uses value from params or instance default.
             num_transforms: Number of transforms in the flow. If None, uses value
                 from params or instance default.
-            hidden_features: Hidden layer size in the flow. If None, uses value
-                from params or instance default.
+            hidden_features: Hidden-layer widths of each transform's network (an
+                int gives two layers). If None, uses value from params or
+                instance default.
             z_score_theta: Method for z-scoring θ (the parameters being modeled).
                 One of "none", "independent", "structured". If None, uses value
                 from params or instance default.

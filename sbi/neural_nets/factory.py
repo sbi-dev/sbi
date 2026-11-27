@@ -3,7 +3,7 @@
 
 from dataclasses import replace
 from enum import Enum
-from typing import Any, Callable, Literal, Optional, Union
+from typing import Any, Callable, Literal, Optional, Sequence, Union
 
 from torch import nn
 
@@ -208,7 +208,7 @@ def likelihood_nn(
     z_score_x: Optional[
         Literal["independent", "structured", "transform_to_unconstrained", "none"]
     ] = "independent",
-    hidden_features: int = 50,
+    hidden_features: Union[int, Sequence[int]] = 50,
     num_transforms: int = 5,
     num_bins: int = 10,
     embedding_net: nn.Module = nn.Identity(),
@@ -235,7 +235,8 @@ def likelihood_nn(
             the network, with the same options as `z_score_theta`. Supported flow
             configs additionally accept `transform_to_unconstrained` for this modeled
             variable.
-        hidden_features: Number of hidden features.
+        hidden_features: Number of hidden features. Zuko flows also take a list of
+            hidden-layer widths; an int gives them two layers of that width.
         num_transforms: Number of transforms when a flow is used. Only relevant if
             density estimator is a normalizing flow (i.e. currently either a `maf` or a
             `nsf`). A non-default value raises if the chosen model does not use it.
@@ -294,7 +295,7 @@ def posterior_nn(
         Literal["independent", "structured", "transform_to_unconstrained", "none"]
     ] = "independent",
     z_score_x: Optional[Literal["independent", "structured", "none"]] = "independent",
-    hidden_features: int = 50,
+    hidden_features: Union[int, Sequence[int]] = 50,
     num_transforms: int = 5,
     num_bins: int = 10,
     embedding_net: nn.Module = nn.Identity(),
@@ -321,7 +322,8 @@ def posterior_nn(
             for this modeled variable.
         z_score_x: Whether to z-score simulation outputs $x$ before passing them into
             the network: `none`, `independent`, or `structured`.
-        hidden_features: Number of hidden features.
+        hidden_features: Number of hidden features. Zuko flows also take a list of
+            hidden-layer widths; an int gives them two layers of that width.
         num_transforms: Number of transforms when a flow is used. Only relevant if
             density estimator is a normalizing flow (i.e. currently either a `maf` or a
             `nsf`). A non-default value raises if the chosen model does not use it.
@@ -774,7 +776,7 @@ def simformer_flow_nn(
 def marginal_nn(
     model: ZukoFlowType,
     z_score_x: Optional[Literal["independent", "structured", "none"]] = "independent",
-    hidden_features: int = 50,
+    hidden_features: Union[int, Sequence[int]] = 50,
     num_transforms: int = 5,
     num_bins: int = 10,
     **kwargs: Any,
@@ -787,7 +789,8 @@ def marginal_nn(
         z_score_x: Whether to z-score samples $x$ before passing them into
             the network. NCSF models data on $[-\pi, \pi)$, which a z-score
             would move, so for NCSF the default becomes `none`.
-        hidden_features: Number of hidden features.
+        hidden_features: Number of hidden features. Zuko flows also take a list of
+            hidden-layer widths; an int gives them two layers of that width.
         num_transforms: Number of transforms when a flow is used.
         num_bins: Number of bins used for the splines in `nsf` and `ncsf`.
         **kwargs: Additional estimator arguments.  Valid keys are the fields of

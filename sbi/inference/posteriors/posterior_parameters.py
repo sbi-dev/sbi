@@ -9,6 +9,7 @@ from typing import (
     Dict,
     Literal,
     Optional,
+    Sequence,
     Union,
     cast,
     get_args,
@@ -393,8 +394,9 @@ class VIPosteriorParameters(PosteriorParameters):
         num_transforms: Number of transforms in the normalizing flow. Used for
             both single-x VI (via set_q/train) and amortized VI (via
             train_amortized).
-        hidden_features: Hidden layer size in the flow networks. Used for both
-            single-x VI and amortized VI.
+        hidden_features: Hidden-layer widths of each transform's network (an int
+            gives two layers). Used for both single-x VI and amortized VI.
+            Single-x VI with `q="gf"` builds no such network and ignores it.
         z_score_theta: Method for z-scoring θ (the parameters being sampled).
             One of "none", "independent", "structured". Used for both single-x
             VI and amortized VI. Use "structured" for parameters with
@@ -427,7 +429,7 @@ class VIPosteriorParameters(PosteriorParameters):
     ] = "maf"
     vi_method: Literal["rKL", "fKL", "IW", "alpha"] = "rKL"
     num_transforms: int = 5
-    hidden_features: int = 50
+    hidden_features: Union[int, Sequence[int]] = 50
     z_score_theta: Literal["none", "independent", "structured"] = "independent"
     z_score_x: Literal["none", "independent", "structured"] = "independent"
 
@@ -454,7 +456,16 @@ class VIPosteriorParameters(PosteriorParameters):
 
         if self.num_transforms < 1:
             raise ValueError(f"num_transforms must be >= 1, got {self.num_transforms}")
-        if self.hidden_features < 1:
+        if isinstance(self.hidden_features, Sequence) and not isinstance(
+            self.hidden_features, (str, bytes)
+        ):
+            widths = self.hidden_features
+            if not widths:
+                raise ValueError("hidden_features must not be an empty sequence")
+        else:
+            object.__setattr__(self, "hidden_features", int(self.hidden_features))
+            widths = [self.hidden_features]
+        if any(width < 1 for width in widths):
             raise ValueError(
                 f"hidden_features must be >= 1, got {self.hidden_features}"
             )
