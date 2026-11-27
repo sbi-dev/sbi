@@ -19,10 +19,12 @@ from sbi.neural_nets.net_builders.estimator_configs import (
     MAFConfig,
     MDNConfig,
     MLPClassifierConfig,
+    MarginalMAFConfig,
     MixedConfig,
     NSFConfig,
     PretrainedConfigBase,
     ResNetClassifierConfig,
+    ZukoMAFConfig,
     ZukoNCSFConfig,
     ZukoNSFConfig,
     _NFlowsFlowConfigBase,
@@ -32,6 +34,7 @@ from sbi.neural_nets.net_builders.estimator_configs import (
 from sbi.neural_nets.net_builders.flow import build_zuko_flow, get_base_dist
 from sbi.neural_nets.ratio_estimators import RatioEstimator
 from sbi.utils import BoxUniform
+from tests.test_utils import zuko_hidden_layer_widths
 
 DENSITY_MODELS = sorted(_DENSITY_CONFIGS)
 # TabPFN needs the optional dependency and a fitted regressor, so it takes part
@@ -421,3 +424,22 @@ def test_nflows_dtype_reaches_the_base_distribution(batches):
     )
 
     assert estimator.net._distribution._log_z.dtype == torch.float64
+
+
+@pytest.mark.parametrize(
+    "hidden_features, widths", [(24, [24, 24]), ([24, 32, 16], [24, 32, 16])]
+)
+@pytest.mark.parametrize("marginal", [False, True])
+def test_zuko_hidden_features_set_the_hidden_layers(
+    marginal, hidden_features, widths, batches
+):
+    """An int gives two hidden layers, whatever the number of transforms."""
+    theta, x = batches
+    if marginal:
+        config = MarginalMAFConfig(hidden_features=hidden_features, num_transforms=5)
+        estimator = config.build(theta)
+    else:
+        config = ZukoMAFConfig(hidden_features=hidden_features, num_transforms=5)
+        estimator = config.build(batch_input=theta, batch_condition=x)
+
+    assert zuko_hidden_layer_widths(estimator) == [widths] * 5
