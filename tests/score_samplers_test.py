@@ -14,6 +14,8 @@ from sbi.inference.posteriors import VectorFieldPosterior
 from sbi.inference.potentials.vector_field_adaptor import (
     FactorizedNPEScoreFunction,
     GaussCorrectedScoreFn,
+    IntervalGuidance,
+    IntervalGuidanceConfig,
     JacCorrectedScoreFn,
     ensure_lam_positive_definite,
 )
@@ -531,3 +533,101 @@ def test_langevin_corrector_scores_at_current_time():
     corrector(torch.zeros(1, 2), t0=torch.tensor(0.3), t1=torch.tensor(0.5))
 
     assert [float(t) for t in queried_times] == [pytest.approx(0.3)]
+
+
+def test_interval_guidance_config_tensor_bounds():
+    """Test that IntervalGuidanceConfig supports Tensor bounds and validates them."""
+    # Valid multidimensional tensor bounds
+    config = IntervalGuidanceConfig(
+        lower_bound=torch.zeros(3),
+        upper_bound=torch.ones(3),
+    )
+    assert config.lower_bound is not None and config.upper_bound is not None
+
+    # Invalid tensor bounds where at least one dimension violates lb < ub
+    with pytest.raises(
+        ValueError, match=r"lower_bound.*must be less than.*upper_bound"
+    ):
+        IntervalGuidanceConfig(
+            lower_bound=torch.tensor([0.0, 2.0]),
+            upper_bound=torch.tensor([1.0, 1.0]),
+        )
+
+    # Valid scalar float bounds
+    config_float = IntervalGuidanceConfig(lower_bound=-1.0, upper_bound=1.0)
+    assert config_float.lower_bound == -1.0
+
+    # Valid scalar float bounds with tight precision (e.g. 1.0 and 1.0 + 1e-8)
+    config_tight = IntervalGuidanceConfig(lower_bound=1.0, upper_bound=1.0 + 1e-8)
+    assert config_tight.lower_bound == 1.0
+
+    # Invalid scalar float bounds
+    with pytest.raises(
+        ValueError, match=r"lower_bound.*must be less than.*upper_bound"
+    ):
+        IntervalGuidanceConfig(lower_bound=2.0, upper_bound=1.0)
+
+    # Missing both bounds
+    with pytest.raises(
+        ValueError,
+        match="At least one of lower_bound or upper_bound is required",
+    ):
+        IntervalGuidanceConfig(lower_bound=None, upper_bound=None)
+
+
+def test_interval_guidance_with_mask_multiple_batch_sizes():
+    """Test IntervalGuidance with mask across different batch sizes without mutation."""
+    score_fn = _build_gaussian_score_estimator(
+        "vp", (3,), torch.zeros(3), torch.ones(3)
+    )
+    mask = torch.tensor([True, False, True])
+    config = IntervalGuidanceConfig(
+        lower_bound=torch.zeros(3),
+        upper_bound=torch.ones(3),
+        mask=mask,
+    )
+    guidance = IntervalGuidance(
+        score_fn.vector_field_estimator, prior=None, config=config
+    )
+
+    # First evaluation with batch size 10
+    inp1 = torch.randn(10, 3)
+    out1 = guidance(inp1, condition=torch.zeros(10, 1), time=torch.tensor([0.5]))
+    assert out1.shape == (10, 3)
+    assert config.mask.shape == torch.Size([3])  # config.mask must NOT be mutated
+
+    # Second evaluation with different batch size 5 (previously crashed with
+    # expand error due to in-place mask mutation)
+    inp2 = torch.randn(5, 3)
+    out2 = guidance(inp2, condition=torch.zeros(5, 1), time=torch.tensor([0.5]))
+    assert out2.shape == (5, 3)
+    assert config.mask.shape == torch.Size([3])
+
+    # Third evaluation with single sample
+    inp3 = torch.randn(1, 3)
+    out3 = guidance(inp3, condition=torch.zeros(1, 1), time=torch.tensor([0.5]))
+    assert out3.shape == (1, 3)
+    assert config.mask.shape == torch.Size([3])
+
+
+def test_interval_guidance_mask_semantics():
+    """Test that IntervalGuidance applies penalties only to masked dimensions."""
+    score_fn = _build_gaussian_score_estimator(
+        "vp", (2,), torch.zeros(2), torch.ones(2)
+    )
+    config = IntervalGuidanceConfig(
+        lower_bound=torch.tensor([0.0, 0.0]),
+        upper_bound=torch.tensor([1.0, 1.0]),
+        mask=torch.tensor([True, False]),
+    )
+    guidance = IntervalGuidance(
+        score_fn.vector_field_estimator, prior=None, config=config
+    )
+
+    # Input far above the upper bound on both dimensions
+    inp = torch.tensor([[10.0, 10.0]])
+    g_score = guidance.guidance_fn_score(
+        inp, None, torch.tensor(1.0), torch.tensor(0.1)
+    )
+    assert g_score[0, 0] < 0.0  # masked dim penalized (steered back)
+    assert g_score[0, 1] == 0.0  # unmasked dim has zero penalty

@@ -382,15 +382,23 @@ class IntervalGuidanceConfig:
     def __post_init__(self) -> None:
         if self.lower_bound is None and self.upper_bound is None:
             raise ValueError("At least one of lower_bound or upper_bound is required.")
-        if (
-            self.lower_bound is not None
-            and self.upper_bound is not None
-            and self.lower_bound >= self.upper_bound
-        ):
-            raise ValueError(
-                f"lower_bound ({self.lower_bound}) must be less than "
-                f"upper_bound ({self.upper_bound})."
-            )
+        if self.lower_bound is not None and self.upper_bound is not None:
+            if isinstance(self.lower_bound, (int, float)) and isinstance(
+                self.upper_bound, (int, float)
+            ):
+                if self.lower_bound >= self.upper_bound:
+                    raise ValueError(
+                        f"lower_bound ({self.lower_bound}) must be less than "
+                        f"upper_bound ({self.upper_bound})."
+                    )
+            else:
+                lb = torch.as_tensor(self.lower_bound)
+                ub = torch.as_tensor(self.upper_bound, device=lb.device)
+                if (lb >= ub).any():
+                    raise ValueError(
+                        f"lower_bound ({self.lower_bound}) must be less than "
+                        f"upper_bound ({self.upper_bound})."
+                    )
 
 
 @register_guidance_method("interval", IntervalGuidanceConfig)
@@ -440,21 +448,32 @@ class IntervalGuidance(UniversalGuidance):
         ) -> Tensor:
             del condition
             scale = config.scale_factor / (m**2 * std**2 + 1e-6)
+            ub = (
+                config.upper_bound.to(device=input.device, dtype=input.dtype)
+                if isinstance(config.upper_bound, Tensor)
+                else config.upper_bound
+            )
+            lb = (
+                config.lower_bound.to(device=input.device, dtype=input.dtype)
+                if isinstance(config.lower_bound, Tensor)
+                else config.lower_bound
+            )
             upper_bound = (
-                F.logsigmoid(-scale * (input - config.upper_bound))
-                if config.upper_bound is not None
+                F.logsigmoid(-scale * (input - ub))
+                if ub is not None
                 else torch.zeros_like(input)
             )
             lower_bound = (
-                F.logsigmoid(scale * (input - config.lower_bound))
-                if config.lower_bound is not None
+                F.logsigmoid(scale * (input - lb))
+                if lb is not None
                 else torch.zeros_like(input)
             )
             out = upper_bound + lower_bound
             if config.mask is not None:
-                if config.mask.shape != out.shape:
-                    config.mask = config.mask.unsqueeze(0).expand_as(out)
-                out = torch.where(config.mask, out, torch.zeros_like(out))
+                mask = config.mask.to(device=input.device)
+                if mask.shape != out.shape:
+                    mask = mask.expand_as(out)
+                out = torch.where(mask, out, torch.zeros_like(out))
             return out
 
         super().__init__(
