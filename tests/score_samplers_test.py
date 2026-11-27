@@ -256,6 +256,115 @@ def test_ensure_lam_positive_definite_keeps_well_conditioned_tall_data():
     assert torch.allclose(corrected, posterior_precision, rtol=1e-6)
 
 
+@pytest.mark.parametrize("rotated", (False, True), ids=("diagonal", "rotated"))
+@pytest.mark.parametrize(
+    "spectrum",
+    (
+        pytest.param((-0.25, -0.25, 2.0), id="mixed-signs"),
+        pytest.param((-0.25, -0.25, -1.0), id="negative-semidefinite"),
+        pytest.param((0.5, 0.5, 2.0), id="positive-definite"),
+    ),
+)
+def test_ensure_lam_positive_definite_gradient(spectrum, rotated):
+    """The correction is the negative part of `Lam` over N - 1 plus the nugget, and
+    its gradient matches central differences at a repeated eigenvalue of `Lam`.
+
+    The perturbation couples the first and the last eigenvector. For mixed signs, a
+    gradient that detaches the eigenvectors would be zero along it.
+    """
+    num_trials, dtype = 3, torch.float64
+    basis = torch.eye(3, dtype=dtype)
+    if rotated:
+        basis = torch.linalg.qr(torch.randn(3, 3, dtype=dtype)).Q
+    eigenvalues = torch.tensor(spectrum, dtype=dtype)
+    lam = basis @ torch.diag(eigenvalues) @ basis.mT
+    first, last = basis[:, 0], basis[:, 2]
+    perturbation = torch.outer(first, last) + torch.outer(last, first)
+    prior_precision = torch.eye(3, dtype=dtype).expand(1, 1, 3, 3)
+
+    def correction(step: float | Tensor) -> Tensor:
+        # Such that (1 - N) * prior + sum(posterior) = lam + step * perturbation.
+        posterior_sum = lam + step * perturbation + (num_trials - 1) * prior_precision
+        posterior_precision = (posterior_sum / num_trials).expand(1, num_trials, 3, 3)
+        _, corrected = ensure_lam_positive_definite(
+            prior_precision, posterior_precision, num_trials, precision_nugget=0.01
+        )
+        return (corrected - posterior_precision)[0, 0]
+
+    step = torch.zeros((), dtype=dtype, requires_grad=True)
+    value = correction(step)
+    (derivative,) = torch.autograd.grad((value * perturbation).sum(), step)
+    difference = correction(1e-5) - correction(-1e-5)
+    finite_difference = (difference * perturbation).sum() / 2e-5
+
+    negative_part = basis @ torch.diag(eigenvalues.neg().clamp(min=0)) @ basis.mT
+    expected = negative_part / (num_trials - 1) + 0.01 * torch.eye(3, dtype=dtype)
+    assert torch.allclose(value, expected)
+    assert torch.allclose(derivative, finite_difference, rtol=1e-6)
+
+
+def test_ensure_lam_positive_definite_gradient_per_batch_element():
+    """A positive definite, a negative semidefinite and a mixed-sign `Lam`, each with a
+    repeated eigenvalue, get their own correction in one batch and a finite gradient.
+    """
+    num_trials, dtype = 3, torch.float64
+    eigenvalues = torch.tensor(
+        [[0.5, 0.5, 2.0], [-0.25, -0.25, -1.0], [-0.25, -0.25, 2.0]], dtype=dtype
+    )
+    lam = torch.diag_embed(eigenvalues).requires_grad_()
+    prior_precision = torch.eye(3, dtype=dtype).expand(3, 1, 3, 3)
+    posterior_sum = lam[:, None] + (num_trials - 1) * prior_precision
+    posterior_precision = (posterior_sum / num_trials).expand(3, num_trials, 3, 3)
+
+    _, corrected = ensure_lam_positive_definite(
+        prior_precision, posterior_precision, num_trials, precision_nugget=0.01
+    )
+    (gradient,) = torch.autograd.grad(corrected.sum(), lam)
+
+    negative_part = torch.diag_embed(eigenvalues.neg().clamp(min=0))
+    expected = negative_part / (num_trials - 1) + 0.01 * torch.eye(3, dtype=dtype)
+    assert torch.allclose((corrected - posterior_precision)[:, 0], expected)
+    assert torch.isfinite(gradient).all()
+
+
+class _ToyJacGaussEstimator(torch.nn.Module):
+    """The estimator of #2197. Its score has a diagonal Jacobian at theta = 1."""
+
+    SCORE_DEFINED = MARGINALS_DEFINED = True
+    mean_t_fn = staticmethod(lambda t: 1 - t)
+    std_fn = staticmethod(lambda t: t)
+
+    def __init__(self, variance: Tensor):
+        super().__init__()
+        self.variance = variance
+
+    def score(self, theta: Tensor, x: Tensor, t: Tensor) -> Tensor:
+        var_t = (1 - t) ** 2 * self.variance + t**2
+        return -theta / var_t - (theta - 1) ** 2 + torch.zeros_like(x)
+
+
+@pytest.mark.parametrize(
+    "variance",
+    (
+        pytest.param((1.0, 1.0, 1.0), id="positive-definite"),
+        pytest.param((4.0, 4.0, 1.0), id="mixed-signs"),
+    ),
+)
+def test_jac_gauss_score_has_finite_gradients_with_lam_correction(variance):
+    """With `ensure_lam_psd=True`, the gradient of the jac_gauss score is finite at
+    repeated eigenvalues of `Lam`, here [2, 2, 2] and [-0.25, -0.25, 2] (#2197)."""
+    prior = MultivariateNormal(torch.zeros(3), torch.eye(3))
+    estimator = _ToyJacGaussEstimator(torch.tensor(variance))
+    score_fn = JacCorrectedScoreFn(estimator, prior, ensure_lam_psd=True)
+    theta = torch.ones(1, 1, 3, requires_grad=True)
+
+    score = score_fn(theta, torch.zeros(3, 1), torch.tensor([0.5]))
+    (gradient,) = torch.autograd.grad(score.sum(), theta)
+
+    assert torch.isfinite(score).all()
+    assert torch.isfinite(gradient).all()
+
+
 @pytest.mark.parametrize("sde_type", ["vp", "ve", "subvp"])
 @pytest.mark.parametrize("iid_method", ["gauss", "jac_gauss"])
 def test_iid_score_is_exact_for_linear_gaussian(sde_type, iid_method):

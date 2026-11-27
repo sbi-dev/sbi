@@ -954,3 +954,41 @@ def add_diag_or_dense(
         return torch.diag_embed(A_diag_or_dense) + B_diag_or_dense
     else:
         raise ValueError("Incompatible dimensions for addition")
+
+
+class _NegativePart(torch.autograd.Function):
+    r"""Negative part :math:`V \max(-\Lambda, 0) V^T` of a symmetric matrix
+    :math:`V \Lambda V^T`.
+
+    The backward of `torch.linalg.eigh` divides by eigenvalue gaps, which gives NaN
+    at repeated eigenvalues. This backward uses the divided differences of
+    :math:`f(\lambda) = \max(-\lambda, 0)` instead (Daleckii-Krein), which are
+    finite. At :math:`\lambda = 0`, it takes the slope :math:`-1` of the branch that
+    the forward uses for :math:`\lambda \le 0`.
+    """
+
+    @staticmethod
+    def forward(ctx, matrix: Tensor) -> Tensor:
+        eigenvalues, eigenvectors = torch.linalg.eigh(matrix)
+        ctx.save_for_backward(eigenvalues, eigenvectors)
+        negative_part = torch.where(eigenvalues <= 0, -eigenvalues, 0.0)
+        return (eigenvectors * negative_part[..., None, :]) @ eigenvectors.mT
+
+    @staticmethod
+    @torch.autograd.function.once_differentiable
+    def backward(ctx, grad_output: Tensor) -> Tensor:
+        eigenvalues, eigenvectors = ctx.saved_tensors
+        nonpositive = eigenvalues <= 0
+        negative_part = torch.where(nonpositive, -eigenvalues, 0.0)
+        # f is linear on each side of zero. Its divided difference is the slope, -1 or
+        # 0, for two eigenvalues of the same sign, and the chord for opposite signs.
+        same_sign = nonpositive[..., :, None] == nonpositive[..., None, :]
+        gaps = eigenvalues[..., :, None] - eigenvalues[..., None, :]
+        rises = negative_part[..., :, None] - negative_part[..., None, :]
+        slopes = -nonpositive[..., :, None].to(eigenvalues.dtype)
+        divided_differences = torch.where(
+            same_sign, slopes, rises / torch.where(same_sign, 1.0, gaps)
+        )
+        grad_output = (grad_output + grad_output.mT) / 2
+        rotated = eigenvectors.mT @ grad_output @ eigenvectors
+        return eigenvectors @ (divided_differences * rotated) @ eigenvectors.mT
