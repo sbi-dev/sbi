@@ -2,6 +2,7 @@
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
 import logging
+import math
 import time
 import warnings
 from typing import Callable, Dict, Optional, Tuple
@@ -246,7 +247,6 @@ def accept_reject_sample(
     num_xos: int = 1,
     show_progress_bars: bool = False,
     warn_acceptance: float = 0.01,
-    sample_for_correction_factor: bool = False,
     max_sampling_batch_size: int = 10_000,
     proposal_sampling_kwargs: Optional[Dict] = None,
     alternative_method: Optional[str] = None,
@@ -282,9 +282,6 @@ def accept_reject_sample(
             one batch dimension for the condition).
         show_progress_bars: Whether to show a progressbar during sampling.
         warn_acceptance: A minimum acceptance rate under which to warn about slowness.
-        sample_for_correction_factor: True if this function was called by
-            `leakage_correction()`. False otherwise. Will be used to adapt the leakage
-             warning and to decide whether we have to search for the maximum.
         max_sampling_batch_size: Batch size for drawing samples from the posterior.
             Takes effect only in the second iteration of the loop below, i.e., in case
             of leakage or `num_samples>max_sampling_batch_size`. Larger batch size
@@ -346,7 +343,7 @@ def accept_reject_sample(
 
     # To cover cases with few samples without leakage:
     sampling_batch_size = min(num_samples, max_sampling_batch_size)
-    num_sampled_total = torch.zeros(num_xos)
+    num_sampled_total = torch.zeros(num_xos, dtype=torch.long)
     num_samples_possible = 0
     # Shape of one draw without the sample dim: `(*event_shape)` for flat proposals,
     # `(num_xos, *event_shape)` for batched ones. Set at each draw.
@@ -417,7 +414,10 @@ def accept_reject_sample(
         )
 
         for i in range(num_xos):
-            accepted[i].append(candidates_to_reject[are_accepted[:, i], i])
+            num_missing = num_samples - int(num_sampled_total[i])
+            if num_missing > 0:
+                rows = are_accepted[:, i].nonzero()[:num_missing, 0]
+                accepted[i].append(candidates_to_reject[rows, i])
 
         # Update.
         # Note: For any condition of shape (*batch_shape, *condition_shape), the
@@ -426,9 +426,9 @@ def accept_reject_sample(
         num_accepted = are_accepted.sum(dim=0)
         num_sampled_total += num_accepted.to(num_sampled_total.device)
         num_samples_possible += sampling_batch_size
-        min_num_accepted = num_accepted.min().item()
-        pbar.update(min(min_num_accepted, num_remaining))
-        num_remaining -= min_num_accepted
+        num_collected = min(int(num_sampled_total.min()), num_samples)
+        pbar.update(num_collected - (num_samples - num_remaining))
+        num_remaining = num_samples - num_collected
 
         # To avoid endless sampling when leakage is high, we raise a warning if the
         # acceptance rate is too low after the first 1_000 samples.
@@ -449,41 +449,23 @@ def accept_reject_sample(
             and not leakage_warning_raised
             and num_remaining > 0
         ):
-            if sample_for_correction_factor:
-                idx_min = acceptance_rate.argmin().item()
-                warn_msg = (
-                    "Drawing samples from posterior to estimate the normalizing "
-                    "constant for `log_prob()`. However, only "
-                    f"{min_acceptance_rate:.3%} posterior samples are within the "
-                    f"prior support (for condition {idx_min}). It may take a long "
-                    f"time to collect the remaining {num_remaining} samples. "
-                    "Consider interrupting (Ctrl-C) and either basing the estimate "
-                    "of the normalizing constant on fewer samples (by passing "
-                    '`leakage_correction_params={"num_rejection_samples": N}` to '
-                    "`log_prob()`, where `N` is the number of samples you want to "
-                    "base the estimate on (default N=10000)), or not estimating the "
-                    "normalizing constant at all (`log_prob(..., "
-                    "norm_posterior=False)`). The latter will result in an "
-                    "unnormalized `log_prob()`."
+            warn_msg = (
+                f"Only {min_acceptance_rate:.3%} proposal samples are accepted. "
+                "It may take a long time to collect the remaining "
+                f"{num_remaining} samples."
+            )
+            if suggest_sampling_options:
+                warn_msg += (
+                    " You can prevent very long runtimes by setting "
+                    "`max_sampling_time` to limit runtime, or disabling "
+                    "rejection sampling (e.g. via `reject_outside_prior=False` "
+                    "in `posterior.sample()` when available)."
                 )
-            else:
-                warn_msg = (
-                    f"Only {min_acceptance_rate:.3%} proposal samples are accepted. "
-                    "It may take a long time to collect the remaining "
-                    f"{num_remaining} samples."
+            if alternative_method is not None:
+                warn_msg += (
+                    " Alternatively, consider interrupting (Ctrl-C) and "
+                    f"switching to `{alternative_method}`."
                 )
-                if suggest_sampling_options:
-                    warn_msg += (
-                        " You can prevent very long runtimes by setting "
-                        "`max_sampling_time` to limit runtime, or disabling "
-                        "rejection sampling (e.g. via `reject_outside_prior=False` "
-                        "in `posterior.sample()` when available)."
-                    )
-                if alternative_method is not None:
-                    warn_msg += (
-                        " Alternatively, consider interrupting (Ctrl-C) and "
-                        f"switching to `{alternative_method}`."
-                    )
             if low_acceptance_hint is not None:
                 warn_msg += f" {low_acceptance_hint}"
             logger.warning(warn_msg)
@@ -501,3 +483,83 @@ def accept_reject_sample(
     )
 
     return samples, as_tensor(acceptance_rate, device=samples.device)
+
+
+@torch.no_grad()
+def count_accepted(
+    proposal: Callable[[int, Tensor], Tensor],
+    accept_reject_fn: AcceptRejectFn,
+    num_xos: int,
+    target_accepted: int,
+    max_num_draws: int,
+    max_sampling_batch_size: int = 10_000,
+    show_progress_bars: bool = False,
+) -> Tuple[Tensor, Tensor]:
+    r"""Count accepted proposal draws per observation to estimate acceptance rates.
+
+    For every observation, draws until `target_accepted` draws are accepted or
+    `max_num_draws` draws are made. The draws are counted, not kept. Observations go
+    in chunks that fit 20% more than `target_accepted` draws each into one call of
+    `proposal`, and one call gets at most `max_sampling_batch_size` draws, so memory
+    does not grow with the number of draws or observations.
+
+    Args:
+        proposal: Called as `proposal(num_draws, indices)` with an index tensor of
+            observations, returns `num_draws` draws for each of them, of shape
+            `(num_draws, len(indices), *event_shape)`.
+        accept_reject_fn: A callable following the `AcceptRejectFn` protocol that
+            returns which draws are accepted.
+        num_xos: Number of observations.
+        target_accepted: Number of accepted draws after which an observation stops.
+        max_num_draws: Number of draws after which an observation stops, whatever it
+            accepted.
+        max_sampling_batch_size: Maximum number of draws per call of `proposal`.
+        show_progress_bars: Whether to show the number of finished observations.
+
+    Returns:
+        Number of accepted draws and number of draws, one per observation.
+    """
+    if not 1 <= target_accepted <= max_num_draws or max_sampling_batch_size < 1:
+        raise ValueError(
+            f"Cannot collect {target_accepted} accepted draws with at most "
+            f"{max_num_draws} draws and {max_sampling_batch_size} draws at once: "
+            "`num_rejection_samples` must be at least 1 and at most `max_num_draws`, "
+            "and the batch size at least 1."
+        )
+    accepted = torch.zeros(num_xos, dtype=torch.long, device="cpu")
+    drawn = torch.zeros(num_xos, dtype=torch.long, device="cpu")
+    pbar = tqdm(
+        disable=not show_progress_bars or is_nested(),
+        total=num_xos,
+        desc=f"Counting accepted draws for {num_xos} observation(s)",
+    )
+    chunk_size = max(1, max_sampling_batch_size // math.ceil(1.2 * target_accepted))
+    for pending in torch.arange(num_xos, device="cpu").split(chunk_size):
+        # Pending observations get the same draws in every step, so one count holds.
+        num_drawn = 0
+        while pending.numel() > 0:
+            # Aim at the slowest pending observation: draw the expected number of draws
+            # for its missing hits, at its rate so far, plus 20% so that one more call
+            # usually suffices; before its first hit, draw twice as many as so far.
+            # Stay within the batch size and the cap.
+            fewest = int(accepted[pending].min())
+            num_draws = 1.2 * (target_accepted - fewest)
+            if fewest > 0:
+                num_draws *= num_drawn / fewest
+            elif num_drawn > 0:
+                num_draws = 2 * num_drawn
+            num_draws = min(
+                math.ceil(num_draws),
+                max_sampling_batch_size // pending.numel(),
+                max_num_draws - num_drawn,
+            )
+            are_accepted = accept_reject_fn(proposal(num_draws, pending))
+            accepted[pending] += are_accepted.reshape(num_draws, -1).sum(dim=0).cpu()
+            num_drawn += num_draws
+
+            done = (accepted[pending] >= target_accepted) | (num_drawn >= max_num_draws)
+            drawn[pending[done]] = num_drawn
+            pbar.update(int(done.sum()))
+            pending = pending[~done]
+    pbar.close()
+    return accepted, drawn

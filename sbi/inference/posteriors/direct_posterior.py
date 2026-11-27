@@ -5,7 +5,7 @@ import warnings
 from typing import Optional, Union
 
 import torch
-from torch import Tensor, log
+from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.posteriors.base_posterior import (
@@ -13,6 +13,7 @@ from sbi.inference.posteriors.base_posterior import (
     _LEAKAGE_HINT,
     _ONE_AT_A_TIME,
     NeuralPosterior,
+    _normalize_by_support_mass,
 )
 from sbi.inference.potentials.posterior_based_potential import (
     posterior_estimator_based_potential,
@@ -314,8 +315,8 @@ class DirectPosterior(NeuralPosterior):
                 consumption.
             leakage_correction_params: A `dict` of keyword arguments to override the
                 default values of `leakage_correction()`. Possible options are:
-                `num_rejection_samples`, `force_update`, `show_progress_bars`, and
-                `rejection_sampling_batch_size`.
+                `num_rejection_samples`, `max_num_draws`, `force_update`,
+                `show_progress_bars`, and `rejection_sampling_batch_size`.
                 These parameters only have an effect if `norm_posterior=True`.
 
         Returns:
@@ -349,16 +350,10 @@ class DirectPosterior(NeuralPosterior):
                 unnorm_log_prob,
                 torch.tensor(float("-inf"), dtype=torch.float32, device=self._device),
             )
-
-            if leakage_correction_params is None:
-                leakage_correction_params = dict()  # use defaults
-            log_factor = (
-                log(self.leakage_correction(x=x, **leakage_correction_params))
-                if norm_posterior
-                else 0
-            )
-
-            return masked_log_prob - log_factor
+            if not norm_posterior:
+                return masked_log_prob
+            mass = self.leakage_correction(x=x, **(leakage_correction_params or {}))
+            return _normalize_by_support_mass(masked_log_prob, mass)
 
     def log_prob_batched(
         self,
@@ -390,8 +385,8 @@ class DirectPosterior(NeuralPosterior):
                 consumption.
             leakage_correction_params: A `dict` of keyword arguments to override the
                 default values of `leakage_correction()`. Possible options are:
-                `num_rejection_samples`, `force_update`, `show_progress_bars`, and
-                `rejection_sampling_batch_size`.
+                `num_rejection_samples`, `max_num_draws`, `force_update`,
+                `show_progress_bars`, and `rejection_sampling_batch_size`.
                 These parameters only have an effect if `norm_posterior=True`.
 
         Returns:
@@ -405,6 +400,15 @@ class DirectPosterior(NeuralPosterior):
         # If theta has 1 leading dim (batch, event), treat it as batch (matching x).
         # otherwise, the leading is sample.
         num_leading = len(theta.shape) - len(event_shape)
+        if num_leading > 2:
+            flat_theta = theta.reshape(-1, *theta.shape[num_leading - 1 :])
+            return self.log_prob_batched(
+                flat_theta,
+                x,
+                norm_posterior,
+                track_gradients,
+                leakage_correction_params,
+            ).reshape(theta.shape[:num_leading])
         theta_density_estimator = reshape_to_sample_batch_event(
             theta, event_shape, leading_is_sample=(num_leading > 1)
         )
@@ -428,18 +432,11 @@ class DirectPosterior(NeuralPosterior):
                 unnorm_log_prob,
                 torch.tensor(float("-inf"), dtype=torch.float32, device=self._device),
             )
+            if not norm_posterior:
+                return masked_log_prob
+            mass = self.leakage_correction(x=x, **(leakage_correction_params or {}))
+            return _normalize_by_support_mass(masked_log_prob, mass)
 
-            if leakage_correction_params is None:
-                leakage_correction_params = dict()  # use defaults
-            log_factor = (
-                log(self.leakage_correction(x=x, **leakage_correction_params))
-                if norm_posterior
-                else 0
-            )
-
-            return masked_log_prob - log_factor
-
-    @torch.no_grad()
     def leakage_correction(
         self,
         x: Tensor,
@@ -447,43 +444,60 @@ class DirectPosterior(NeuralPosterior):
         force_update: bool = False,
         show_progress_bars: bool = False,
         rejection_sampling_batch_size: int = 10_000,
+        max_num_draws: Optional[int] = None,
     ) -> Tensor:
         r"""Return leakage correction factor for a leaky posterior density estimate.
 
-        The factor is estimated from the acceptance probability during rejection
-        sampling from the posterior. It is saved for the last `x` and re-estimated
-        whenever `x` or `num_rejection_samples` changes. It is 1 for unbounded priors.
+        The factor is the share of posterior draws inside the prior support. For each
+        observation, it draws until `num_rejection_samples` draws are inside or
+        `max_num_draws` draws are made. Without any draw inside, the factor is 0, with
+        a warning, and `log_prob()` is NaN inside the prior support. The factor is
+        saved for the last `x` and re-estimated whenever `x`, `num_rejection_samples`
+        or `max_num_draws` changes. It is 1 for unbounded priors.
 
         Arguments:
             x: Observation at which to estimate the factor.
-            num_rejection_samples: Number of samples used to estimate correction factor.
+            num_rejection_samples: Number of draws inside the prior support after
+                which the estimate stops.
             force_update: Whether to re-estimate the factor even if it is saved.
             show_progress_bars: Whether to show a progress bar during sampling.
-            rejection_sampling_batch_size: Batch size for rejection sampling.
+            rejection_sampling_batch_size: Maximum number of draws at once, over all
+                observations in `x`.
+            max_num_draws: Number of draws per observation after which the estimate
+                stops, whatever it found inside. Defaults to the larger of
+                `num_rejection_samples` and 1_000_000.
 
         Returns:
             Saved or newly-estimated correction factor, one per observation in `x`.
         """
         x = self._x_else_default_x(x)
+        if max_num_draws is None:
+            max_num_draws = max(num_rejection_samples, 1_000_000)
+        condition = reshape_to_batch_event(
+            x, event_shape=self.posterior_estimator.condition_shape
+        )
 
-        def acceptance() -> Tensor:
-            return rejection.accept_reject_sample(
-                proposal=self.posterior_estimator.sample,
-                accept_reject_fn=lambda theta: within_support(self.prior, theta),
-                num_samples=num_rejection_samples,
-                show_progress_bars=show_progress_bars,
-                sample_for_correction_factor=True,
-                max_sampling_batch_size=rejection_sampling_batch_size,
-                low_acceptance_hint=_NPE_LEAKAGE_HINT,
-                proposal_sampling_kwargs={
-                    "condition": reshape_to_batch_event(
-                        x, event_shape=self.posterior_estimator.condition_shape
-                    )
-                },
-            )[1]
+        def proposal(num_draws: int, indices: Tensor) -> Tensor:
+            return self.posterior_estimator.sample(
+                torch.Size((num_draws,)),
+                condition=condition[indices.to(condition.device)],
+            )
 
         return self._cached_leakage_factor(
-            x, num_rejection_samples, self.prior, acceptance, force_update
+            x,
+            (num_rejection_samples, max_num_draws),
+            self.prior,
+            lambda: rejection.count_accepted(
+                proposal=proposal,
+                accept_reject_fn=lambda theta: within_support(self.prior, theta),
+                num_xos=condition.shape[0],
+                target_accepted=num_rejection_samples,
+                max_num_draws=max_num_draws,
+                max_sampling_batch_size=rejection_sampling_batch_size,
+                show_progress_bars=show_progress_bars,
+            ),
+            _NPE_LEAKAGE_HINT,
+            force_update,
         )
 
     def map(

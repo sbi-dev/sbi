@@ -233,7 +233,10 @@ def get_nltp(thetas: Tensor, xs: Tensor, posterior: NeuralPosterior) -> Tensor:
     and NPSE.
     With a bounded prior, `log_prob()` estimates a leakage correction for each `x`.
     For vector field posteriors (FMPE, NPSE), this needs ODE sampling for each `x`
-    and can be slow.
+    and can be slow. When no posterior draw for an `x` falls inside the prior, its
+    NLTP is NaN: drop these rows and report how many there are. With 95% confidence,
+    such a row has a mass below about 3e-6 for NPE, but below about 3e-4 for FMPE and
+    NPSE, because their default `max_num_draws` differ (see `leakage_correction()`).
 
     Args:
         thetas: Parameters (sampled from the prior) for which to calculate NLTP values.
