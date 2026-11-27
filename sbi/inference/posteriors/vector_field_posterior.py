@@ -513,7 +513,7 @@ class VectorFieldPosterior(NeuralPosterior):
         num_rejection_samples: int = 10_000,
         force_update: bool = False,
         ode_kwargs: Optional[Dict] = None,
-        max_num_draws: int = 10_000,
+        max_num_draws: Optional[int] = None,
     ) -> Tensor:
         r"""Return the probability mass of the ODE density inside the prior support.
 
@@ -533,7 +533,8 @@ class VectorFieldPosterior(NeuralPosterior):
             ode_kwargs: Additional keyword arguments for the ODE solver. Must match
                 the ones used for the density that is corrected.
             max_num_draws: Number of ODE samples after which the estimate stops,
-                whatever it found inside.
+                whatever it found inside. Defaults to the larger of
+                `num_rejection_samples` and 10_000.
 
         Returns:
             Saved or newly-estimated correction factor (as a scalar `Tensor`).
@@ -544,6 +545,8 @@ class VectorFieldPosterior(NeuralPosterior):
             "`leakage_correction()` of a vector field posterior",
             "Pass one observation.",
         )
+        if max_num_draws is None:
+            max_num_draws = max(num_rejection_samples, 10_000)
 
         def counts() -> Tuple[Tensor, Tensor]:
             self.potential_fn = self.potential_fn.bind(x, **(ode_kwargs or {}))

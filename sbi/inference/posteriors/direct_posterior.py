@@ -447,7 +447,7 @@ class DirectPosterior(NeuralPosterior):
         force_update: bool = False,
         show_progress_bars: bool = False,
         rejection_sampling_batch_size: int = 10_000,
-        max_num_draws: int = 1_000_000,
+        max_num_draws: Optional[int] = None,
     ) -> Tensor:
         r"""Return leakage correction factor for a leaky posterior density estimate.
 
@@ -467,12 +467,15 @@ class DirectPosterior(NeuralPosterior):
             rejection_sampling_batch_size: Maximum number of draws at once, over all
                 observations in `x`.
             max_num_draws: Number of draws per observation after which the estimate
-                stops, whatever it found inside.
+                stops, whatever it found inside. Defaults to the larger of
+                `num_rejection_samples` and 1_000_000.
 
         Returns:
             Saved or newly-estimated correction factor, one per observation in `x`.
         """
         x = self._x_else_default_x(x)
+        if max_num_draws is None:
+            max_num_draws = max(num_rejection_samples, 1_000_000)
         condition = reshape_to_batch_event(
             x, event_shape=self.posterior_estimator.condition_shape
         )

@@ -238,7 +238,7 @@ class FilteredDirectPosterior(DirectPosterior):
         force_update: bool = False,
         show_progress_bars: bool = False,
         rejection_sampling_batch_size: int = 10_000,
-        max_num_draws: int = 1_000_000,
+        max_num_draws: Optional[int] = None,
     ) -> Tensor:
         """Estimate the leakage correction factor after setting context for `x`.
 
