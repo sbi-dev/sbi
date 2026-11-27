@@ -563,6 +563,7 @@ class VectorFieldPosterior(NeuralPosterior):
             (num_rejection_samples, max_num_draws),
             self.prior,
             counts,
+            _LEAKAGE_HINT,
             force_update,
             use_cache=not ode_kwargs,
         ).reshape(())

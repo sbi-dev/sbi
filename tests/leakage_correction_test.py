@@ -204,6 +204,7 @@ def test_leakage_cache_matches_nan_padded_x():
             100,
             prior,
             lambda: calls.append(1) or (ones, ones),
+            "",
         )
     assert len(calls) == 1
 

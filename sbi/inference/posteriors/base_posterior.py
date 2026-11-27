@@ -383,6 +383,7 @@ class NeuralPosterior:
         key: Hashable,
         prior: Any,
         count_fn: Callable[[], Tuple[Tensor, Tensor]],
+        hint: str,
         force_update: bool = False,
         use_cache: bool = True,
     ) -> Tensor:
@@ -390,7 +391,7 @@ class NeuralPosterior:
 
         The factor is the share of the draws of `count_fn` inside the prior support,
         or 1 for priors with unbounded support. The counts are saved for the last `x`
-        and `key`, unless `use_cache=False`.
+        and `key`, unless `use_cache=False`. A low share warns with `hint`.
         """
         if prior_support_is_bounded(prior) is False:
             return torch.ones((), device=self._device)
@@ -401,7 +402,7 @@ class NeuralPosterior:
             counts = count_fn()
             if use_cache:
                 self._leakage_cache = (x.detach().clone(), key, counts)
-        return _support_mass(*counts).to(self._device)
+        return _support_mass(*counts, hint).to(self._device)
 
     @staticmethod
     def _cached_value(
@@ -633,7 +634,7 @@ _LEAKAGE_HINT = (
 )
 
 
-def _support_mass(num_accepted: Tensor, num_drawn: Tensor) -> Tensor:
+def _support_mass(num_accepted: Tensor, num_drawn: Tensor, hint: str) -> Tensor:
     """Return the share of draws inside the prior support, one per observation.
 
     Warns for observations with less than 1% of their draws inside, and gives the
@@ -644,7 +645,7 @@ def _support_mass(num_accepted: Tensor, num_drawn: Tensor) -> Tensor:
     if low.any():
         message = (
             f"{int(low.sum())} of {low.numel()} observation(s) have less than 1% of "
-            f"their posterior draws inside the prior support. {_LEAKAGE_HINT}"
+            f"their posterior draws inside the prior support. {hint}"
         )
         if empty.any():
             num_draws = int(num_drawn[empty].min())

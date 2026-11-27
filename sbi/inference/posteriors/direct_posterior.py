@@ -496,6 +496,7 @@ class DirectPosterior(NeuralPosterior):
                 max_sampling_batch_size=rejection_sampling_batch_size,
                 show_progress_bars=show_progress_bars,
             ),
+            _NPE_LEAKAGE_HINT,
             force_update,
         )
 
