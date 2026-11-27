@@ -590,6 +590,7 @@ class VIPosterior(NeuralPosterior):
                 detach_and_deepcopy(q._prior), self._device
             )
             self._x = None if q._x is None else q._x.to(self._device)
+            self._x_from_potential = q._x_from_potential
             self._map = None
             q = detach_and_deepcopy(q.q)
             # Move copied q to self's device (source may be on a different device).
@@ -852,9 +853,10 @@ class VIPosterior(NeuralPosterior):
         A single-x q answers for one observation only, so `sample()`, `log_prob()`,
         `potential()` and `map()` fall back to it when no `x` is given.
         """
-        if self.default_x is None and self._mode == "single_x":
+        x = self.default_x
+        if x is None and self._mode == "single_x":
             return self._trained_on
-        return self.default_x
+        return x
 
     def _is_trained_on(self, x: Tensor) -> bool:
         """Whether q was trained on `x`: the same shape and the same values.
@@ -991,11 +993,8 @@ class VIPosterior(NeuralPosterior):
             )
 
         # Check context. Training does not fall back to the x of an earlier fit.
-        if x is not None:
-            x = self._process_x(x)
-        elif self.default_x is not None:
-            x = self.default_x
-        else:
+        x = self._process_x(x) if x is not None else self.default_x
+        if x is None:
             raise ValueError(
                 "Pass `x` to `train()`, or set a default with `.set_default_x()`."
             )

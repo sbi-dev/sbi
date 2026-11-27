@@ -173,7 +173,6 @@ class PosteriorPotential(BasePotential):
         self,
         posterior: Distribution,
         prior: Distribution,
-        x_o: Optional[Tensor] = None,
         device: str = "cpu",
     ):
         r"""Returns the potential for a closed-form posterior.
@@ -184,16 +183,11 @@ class PosteriorPotential(BasePotential):
         Args:
             posterior: The posterior distribution
             prior: The prior distribution.
-            x_o: The observed data at which to evaluate the posterior.
 
         Returns:
             The potential function.
         """
-        super().__init__(prior, x_o, device)
-
-        assert x_o is None, (
-            "No need to pass x_o, passed Posterior must be fixed to x_o."
-        )
+        super().__init__(prior, device=device)
         self.posterior = posterior
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:

@@ -433,7 +433,6 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
         potential_fn, theta_transform = ratio_estimator_based_potential(
             ratio_estimator=estimator,
             prior=prior,
-            x_o=None,
         )
 
         return potential_fn, theta_transform

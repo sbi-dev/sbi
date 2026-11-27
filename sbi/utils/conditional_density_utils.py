@@ -292,7 +292,7 @@ class ConditionedPotential(BasePotential):
         import warnings
 
         warnings.warn(
-            "set_x() is deprecated, use bind() instead",
+            "`set_x()` is deprecated and will be removed in sbi 0.29. Use `bind()`.",
             FutureWarning,
             stacklevel=2,
         )
@@ -313,10 +313,7 @@ class ConditionedPotential(BasePotential):
     @property
     def x_o(self) -> Tensor:
         """Return the observed data at which the potential is evaluated."""
-        if self.potential_fn._x_o is not None:
-            return self.potential_fn._x_o
-        else:
-            raise ValueError("No observed data is available.")
+        return self.potential_fn.x_o
 
     def return_x_o(self) -> Optional[Tensor]:
         """Return the observed data at which the potential is evaluated.
@@ -324,7 +321,7 @@ class ConditionedPotential(BasePotential):
         Difference to the `x_o` property is that it will not raise an error if
         `self._x_o` is `None`.
         """
-        return self.potential_fn._x_o
+        return self.potential_fn.return_x_o()
 
 
 class RestrictedPriorForConditional:

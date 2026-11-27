@@ -594,7 +594,6 @@ class VectorFieldTrainer(
         potential_fn, theta_transform = vector_field_estimator_based_potential(
             estimator,
             prior,
-            x_o=None,
         )
         return potential_fn, theta_transform
 

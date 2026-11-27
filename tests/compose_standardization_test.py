@@ -210,8 +210,8 @@ def test_checkpoint_loading_rejects_invalid_compose_affine(
         ("sample_guidance", "guided"),
         ("log_prob_iid", "iid"),
         ("map", "MAP"),
-        ("set_x_iid", "iid"),
-        ("set_x_guidance", "guided"),
+        ("bind_iid", "iid"),
+        ("bind_guidance", "guided"),
         ("sample_batched", "sample_batched"),
     ],
 )
@@ -234,10 +234,10 @@ def test_unsupported_entrypoints_raise(entrypoint, error_match):
             posterior.log_prob(torch.zeros(1, NUM_DIM), x=x_iid)
         elif entrypoint == "map":
             posterior.map(show_progress_bars=False)
-        elif entrypoint == "set_x_iid":
-            potential.set_x(x_iid, x_is_iid=True)
-        elif entrypoint == "set_x_guidance":
-            potential.set_x(
+        elif entrypoint == "bind_iid":
+            potential.bind(x_iid, x_is_iid=True)
+        elif entrypoint == "bind_guidance":
+            potential.bind(
                 torch.zeros(1, NUM_DIM),
                 guidance_method="classifier_free",
             )
@@ -275,10 +275,9 @@ def test_single_observation_log_prob_jacobian_exact():
     theta, x = _batches(dim)
     estimator = FlowMatchingConfig(compose_standardization=True).build(theta, x)
     prior = Independent(Normal(torch.zeros(dim), 100.0 * torch.ones(dim)), 1)
-    potential = VectorFieldBasedPotential(
-        estimator, prior=prior, x_o=None, device="cpu"
+    potential = VectorFieldBasedPotential(estimator, prior=prior).bind(
+        torch.zeros(1, dim), x_is_iid=False
     )
-    potential.set_x(torch.zeros(1, dim), x_is_iid=False)
     estimator._theta_scale.copy_(torch.tensor([[2.0, 3.0]]))
     potential.flow.log_prob = lambda z: torch.full(z.shape[:-1], 7.0)
 

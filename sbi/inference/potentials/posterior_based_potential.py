@@ -10,7 +10,9 @@ from torch import Tensor, nn
 from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import (
+    _UNSET,
     BasePotential,
+    _DeprecatedXo,
     unpaired_batch_error,
 )
 from sbi.neural_nets.estimators import ConditionalDensityEstimator
@@ -29,7 +31,7 @@ from sbi.utils.torchutils import ensure_theta_batched, infer_module_device
 def posterior_estimator_based_potential(
     posterior_estimator: ConditionalDensityEstimator,
     prior: Distribution,
-    x_o: Optional[Tensor],
+    x_o: _DeprecatedXo = _UNSET,
     enable_transform: bool = True,
 ) -> Tuple[PosteriorBasedPotential, TorchTransform]:
     r"""Returns the potential for posterior-based methods.
@@ -43,7 +45,7 @@ def posterior_estimator_based_potential(
     Args:
         posterior_estimator: The neural network modelling the posterior.
         prior: The prior distribution.
-        x_o: The observed data at which to evaluate the posterior.
+        x_o: Deprecated, will be removed in sbi 0.29. Use `potential_fn.bind(x_o)`.
         enable_transform: Whether to transform parameters to unconstrained space.
             When False, an identity transform will be returned for `theta_transform`.
 
@@ -70,7 +72,7 @@ class PosteriorBasedPotential(BasePotential):
         self,
         posterior_estimator: ConditionalDensityEstimator,
         prior: Distribution,  # type: ignore
-        x_o: Optional[Tensor] = None,
+        x_o: _DeprecatedXo = _UNSET,
         device: Union[str, torch.device] = "cpu",
     ):
         r"""Returns the potential for posterior-based methods.
@@ -81,7 +83,8 @@ class PosteriorBasedPotential(BasePotential):
         Args:
             posterior_estimator: The neural network modelling the posterior.
             prior: The prior distribution.
-            x_o: The observed data at which to evaluate the posterior.
+            x_o: Deprecated, will be removed in sbi 0.29. Use `bind(x_o)` instead.
+            device: Device on which to evaluate the potential function.
 
         Returns:
             The potential function.
@@ -131,7 +134,6 @@ class PosteriorBasedPotential(BasePotential):
         bound = PosteriorBasedPotential(
             posterior_estimator=self.posterior_estimator,
             prior=self.prior,
-            x_o=None,
             device=self.device,
         )
         bound._x_o = self._prepare_x_o(x_o)
@@ -142,13 +144,11 @@ class PosteriorBasedPotential(BasePotential):
         """Check the shape of the observed data and, if valid, set it.
 
         DEPRECATED: Use bind() instead. This method delegates to bind() internally.
-        It will be removed in a future release.
         """
         import warnings
 
         warnings.warn(
-            "set_x() is deprecated and will be removed in a future release. "
-            "Use bind() instead.",
+            "`set_x()` is deprecated and will be removed in sbi 0.29. Use `bind()`.",
             FutureWarning,
             stacklevel=2,
         )
@@ -166,12 +166,6 @@ class PosteriorBasedPotential(BasePotential):
         Returns:
             The potential.
         """
-
-        if self._x_o is None:
-            raise ValueError(
-                "No observed data x_o is available. Please reinitialize \
-                the potential or manually set self._x_o."
-            )
 
         with torch.set_grad_enabled(track_gradients):
             # Force probability to be zero outside prior support.

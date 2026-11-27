@@ -61,7 +61,7 @@ def test_mdn_inference_with_different_methods(
         posterior = DirectPosterior(posterior_estimator=estimator, prior=prior)
     else:
         potential_fn, theta_transform = likelihood_estimator_based_potential(
-            likelihood_estimator=estimator, prior=prior, x_o=x_o
+            likelihood_estimator=estimator, prior=prior
         )
         posterior = MCMCPosterior(
             potential_fn=potential_fn,

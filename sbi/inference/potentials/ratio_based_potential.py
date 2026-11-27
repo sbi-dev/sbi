@@ -7,7 +7,12 @@ import torch
 from torch import Tensor, nn
 from torch.distributions import Distribution
 
-from sbi.inference.potentials.base_potential import BasePotential, unpaired_batch_error
+from sbi.inference.potentials.base_potential import (
+    _UNSET,
+    BasePotential,
+    _DeprecatedXo,
+    unpaired_batch_error,
+)
 from sbi.sbi_types import TorchTransform
 from sbi.utils.sbiutils import match_theta_and_x_batch_shapes, mcmc_transform
 from sbi.utils.torchutils import atleast_2d
@@ -16,7 +21,7 @@ from sbi.utils.torchutils import atleast_2d
 def ratio_estimator_based_potential(
     ratio_estimator: nn.Module,
     prior: Distribution,
-    x_o: Optional[Tensor],
+    x_o: _DeprecatedXo = _UNSET,
     enable_transform: bool = True,
 ) -> Tuple["RatioBasedPotential", TorchTransform]:
     r"""Returns the potential for ratio-based methods.
@@ -27,7 +32,7 @@ def ratio_estimator_based_potential(
     Args:
         ratio_estimator: The neural network modelling likelihood-to-evidence ratio.
         prior: The prior distribution.
-        x_o: The observed data at which to evaluate the likelihood-to-evidence ratio.
+        x_o: Deprecated, will be removed in sbi 0.29. Use `potential_fn.bind(x_o)`.
         enable_transform: Whether to transform parameters to unconstrained space.
             When False, an identity transform will be returned for `theta_transform`.
 
@@ -51,7 +56,7 @@ class RatioBasedPotential(BasePotential):
         self,
         ratio_estimator: nn.Module,
         prior: Distribution,  # type: ignore
-        x_o: Optional[Tensor] = None,
+        x_o: _DeprecatedXo = _UNSET,
         device: Union[str, torch.device] = "cpu",
     ):
         r"""Returns the potential for ratio-based methods.
@@ -59,8 +64,8 @@ class RatioBasedPotential(BasePotential):
         Args:
             ratio_estimator: The neural network modelling likelihood-to-evidence ratio.
             prior: The prior distribution.
-            x_o: The observed data at which to evaluate the likelihood-to-evidence
-                ratio.
+            x_o: Deprecated, will be removed in sbi 0.29. Use `bind(x_o)` instead.
+            device: Device on which to evaluate the potential function.
 
         Returns:
             The potential function.
@@ -99,7 +104,6 @@ class RatioBasedPotential(BasePotential):
         bound = RatioBasedPotential(
             ratio_estimator=self.ratio_estimator,
             prior=self.prior,
-            x_o=None,
             device=self.device,
         )
         bound._x_o = self._prepare_x_o(x_o)

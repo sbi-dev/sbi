@@ -57,9 +57,7 @@ def test_api_posterior_sampler_set(
     theta = prior.sample((num_simulations,))
     x = simulator(theta)
     estimator = inference.append_simulations(theta, x).train(max_num_epochs=5)
-    potential_fn, transform = likelihood_estimator_based_potential(
-        estimator, prior, x_o
-    )
+    potential_fn, transform = likelihood_estimator_based_potential(estimator, prior)
     posterior = MCMCPosterior(
         potential_fn,
         theta_transform=transform,

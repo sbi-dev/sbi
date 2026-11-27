@@ -14,7 +14,11 @@ from sbi.inference.posteriors.base_posterior import (
     NeuralPosterior,
     _require_one_observation,
 )
-from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.base_potential import (
+    _UNSET,
+    BasePotential,
+    _DeprecatedXo,
+)
 from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils.sbiutils import gradient_ascent, mcmc_transform
 from sbi.utils.torchutils import ensure_theta_batched, process_device
@@ -143,7 +147,7 @@ class EnsemblePosterior(NeuralPosterior):
             )
 
         potential_fn = EnsemblePotential(
-            potential_fns, self._weights, self.prior, None, device=self.device
+            potential_fns, self._weights, self.prior, device=self.device
         )
 
         super().__init__(
@@ -200,30 +204,14 @@ class EnsemblePosterior(NeuralPosterior):
             ValueError: If the posteriors do not all use the same observation,
                 since their mixture would mix posteriors of different observations.
         """
-        if self.default_x is not None:
-            return self.default_x
+        x = self.default_x
+        if x is not None:
+            return x
         component_xs = [posterior._resolve_x() for posterior in self.posteriors]
         if all(x is None for x in component_xs):
             return None
-        self._check_posteriors_share_x(component_xs[0])
+        _check_posteriors_share_x(component_xs[0], component_xs)
         return component_xs[0]
-
-    def _check_posteriors_share_x(self, x: Tensor) -> None:
-        """Raise unless every posterior of the ensemble uses `x` when it gets none."""
-        for posterior in self.posteriors:
-            implicit_x = posterior._resolve_x()
-            # NaN entries pad sets of trials for permutation-invariant embeddings.
-            if (
-                implicit_x is None
-                or implicit_x.shape != x.shape
-                or not torch.allclose(implicit_x, x, rtol=0, atol=0, equal_nan=True)
-            ):
-                raise ValueError(
-                    "The posteriors of the ensemble do not all use the same "
-                    "observation (their default x, or for VI the x q was fit to). Set "
-                    "one observation for all of them with `set_default_x()` of the "
-                    "ensemble."
-                )
 
     @property
     def weights(self) -> Tensor:
@@ -552,7 +540,10 @@ class EnsemblePosterior(NeuralPosterior):
             )
 
         if individually:
-            self._check_posteriors_share_x(self._x_else_default_x(None))
+            _check_posteriors_share_x(
+                self._x_else_default_x(None),
+                [posterior._resolve_x() for posterior in self.posteriors],
+            )
             maps = []
             log_weights = torch.log(self._weights).reshape(-1, 1)
 
@@ -586,6 +577,23 @@ class EnsemblePosterior(NeuralPosterior):
                 save_best_every=save_best_every,
                 show_progress_bars=show_progress_bars,
             )[0]
+
+
+def _check_posteriors_share_x(x: Tensor, component_xs: List[Optional[Tensor]]) -> None:
+    """Raise unless every posterior of the ensemble uses `x` when it gets none."""
+    for implicit_x in component_xs:
+        # NaN entries pad sets of trials for permutation-invariant embeddings.
+        if (
+            implicit_x is None
+            or implicit_x.shape != x.shape
+            or not torch.allclose(implicit_x, x, rtol=0, atol=0, equal_nan=True)
+        ):
+            raise ValueError(
+                "The posteriors of the ensemble do not all use the same "
+                "observation (their default x, or for VI the x q was fit to). Set "
+                "one observation for all of them with `set_default_x()` of the "
+                "ensemble."
+            )
 
 
 def _resolve_x_event_shape(potentials: List) -> Optional[torch.Size]:
@@ -629,7 +637,7 @@ class EnsemblePotential(BasePotential):
         potential_fns: List,
         weights: Tensor,
         prior: Distribution,
-        x_o: Optional[Tensor],
+        x_o: _DeprecatedXo = _UNSET,
         device: Union[str, torch.device] = "cpu",
     ):
         r"""
@@ -637,14 +645,14 @@ class EnsemblePotential(BasePotential):
             potential_fns: List of the potential_fns from each posterior component.
             weights: Weights of each posterior distribution.
             prior: Prior distribution.
-            x_o: Used as conditioning context for `potential_fn`.
+            x_o: Deprecated, will be removed in sbi 0.29. Use `bind(x_o)` instead.
             device: Device which the component distributions sit on.
         """
         self._weights = weights
         self.potential_fns = potential_fns
         _resolve_x_event_shape(potential_fns)
         super().__init__(prior, x_o, device)
-        if self._x_o is not None:
+        if self._x_o is not None:  # Deprecated `x_o`, removed in sbi 0.29.
             self.potential_fns = [p.bind(self._x_o) for p in self.potential_fns]
 
     def to(self, device: Union[str, torch.device]) -> Self:
@@ -681,12 +689,10 @@ class EnsemblePotential(BasePotential):
         """Check the shape of the observed data and, if valid, set it.
 
         DEPRECATED: Use bind() instead. This method delegates to bind() internally.
-        It will be removed in a future release.
         """
 
         warnings.warn(
-            "set_x() is deprecated and will be removed in a future release. "
-            "Use bind() instead.",
+            "`set_x()` is deprecated and will be removed in sbi 0.29. Use `bind()`.",
             FutureWarning,
             stacklevel=2,
         )
@@ -722,7 +728,6 @@ class EnsemblePotential(BasePotential):
             potential_fns=bound_potentials,
             weights=self._weights,
             prior=self.prior,
-            x_o=None,
             device=self.device,
         )
         bound._x_o = x_o

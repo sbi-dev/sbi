@@ -9,7 +9,11 @@ from torch import Tensor, nn
 from torch.distributions import Distribution
 from zuko.distributions import NormalizingFlow
 
-from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.base_potential import (
+    _UNSET,
+    BasePotential,
+    _DeprecatedXo,
+)
 from sbi.inference.potentials.vector_field_adaptor import (
     get_guidance_method,
     get_iid_method,
@@ -30,7 +34,7 @@ class VectorFieldBasedPotential(BasePotential):
         self,
         vector_field_estimator: ConditionalVectorFieldEstimator,
         prior: Optional[Distribution],  # type: ignore
-        x_o: Optional[Tensor] = None,
+        x_o: _DeprecatedXo = _UNSET,
         device: Union[str, torch.device] = "cpu",
         iid_method: Literal["fnpe", "gauss", "auto_gauss", "jac_gauss"] = "auto_gauss",
         iid_params: Optional[Dict[str, Any]] = None,
@@ -49,7 +53,7 @@ class VectorFieldBasedPotential(BasePotential):
         Args:
             vector_field_estimator: The neural network modelling the vector field.
             prior: The prior distribution.
-            x_o: The observed data at which to evaluate the posterior.
+            x_o: Deprecated, will be removed in sbi 0.29. Use `bind(x_o)` instead.
             device: The device on which to evaluate the potential.
             iid_method: Which method to use for computing the score in the iid setting.
                 We currently support "fnpe", "gauss", "auto_gauss", "jac_gauss".
@@ -82,7 +86,7 @@ class VectorFieldBasedPotential(BasePotential):
 
         super().__init__(prior, x_o, device=device)
         self._x_is_iid = False
-        if self._x_o is not None:
+        if self._x_o is not None:  # Deprecated `x_o`, removed in sbi 0.29.
             self.flow = self.rebuild_flow()
 
     @property
@@ -167,8 +171,7 @@ class VectorFieldBasedPotential(BasePotential):
         """
 
         warnings.warn(
-            "set_x() is deprecated and will be removed in a future release. "
-            "Use bind() instead.",
+            "`set_x()` is deprecated and will be removed in sbi 0.29. Use `bind()`.",
             FutureWarning,
             stacklevel=2,
         )
@@ -226,7 +229,6 @@ class VectorFieldBasedPotential(BasePotential):
         bound = VectorFieldBasedPotential(
             vector_field_estimator=self.vector_field_estimator,
             prior=self.prior,
-            x_o=None,
             device=self.device,
             iid_method=iid_method if iid_method is not None else self.iid_method,
             iid_params=iid_params,
@@ -265,6 +267,7 @@ class VectorFieldBasedPotential(BasePotential):
             raise NotImplementedError(
                 "Potential evaluation for guidance is not supported yet."
             )
+        x_o = self.x_o  # Raises if no `x_o` is bound.
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         theta_density_estimator = reshape_to_sample_batch_event(
@@ -287,7 +290,7 @@ class VectorFieldBasedPotential(BasePotential):
                 assert self.flows is not None, (
                     "Flows for each iid x are required for evaluating log_prob."
                 )
-                num_iid = self.x_o.shape[0]  # number of iid samples
+                num_iid = x_o.shape[0]  # number of iid samples
                 iid_posteriors_prob = torch.sum(
                     torch.stack(
                         [flow.log_prob(flow_input).squeeze(-1) for flow in self.flows],
@@ -347,12 +350,6 @@ class VectorFieldBasedPotential(BasePotential):
             time = torch.tensor([self.vector_field_estimator.t_min])
         assert time is not None
 
-        if self._x_o is None:
-            raise ValueError(
-                "No observed data x_o is available. Please reinitialize "
-                "the potential or manually set self._x_o."
-            )
-
         if self.guidance_method is not None:
             score_wrapper, config_cls = get_guidance_method(self.guidance_method)
             config_params = config_cls(**(self.guidance_params or {}))
@@ -392,11 +389,6 @@ class VectorFieldBasedPotential(BasePotential):
         Rebuilds the continuous normalizing flow. This is used when
         a new default x is set, or to evaluate the log probs at higher precision.
         """
-        if self._x_o is None:
-            raise ValueError(
-                "No observed data x_o is available. Please reinitialize "
-                "the potential or manually set self._x_o."
-            )
         x_density_estimator = reshape_to_batch_event(
             self.x_o, event_shape=self.vector_field_estimator.condition_shape
         )
@@ -409,14 +401,9 @@ class VectorFieldBasedPotential(BasePotential):
         Rebuilds the continuous normalizing flows for each iid in x_o. This is used when
         a new default x_o is set, or to evaluate the log probs at higher precision.
         """
-        if self._x_o is None:
-            raise ValueError(
-                "No observed data x_o is available. Please reinitialize "
-                "the potential or manually set self._x_o."
-            )
         flows = []
-        for i in range(self._x_o.shape[0]):
-            iid_x = self._x_o[i]
+        for i in range(self.x_o.shape[0]):
+            iid_x = self.x_o[i]
             x_density_estimator = reshape_to_batch_event(
                 iid_x, event_shape=self.vector_field_estimator.condition_shape
             )
@@ -429,7 +416,7 @@ class VectorFieldBasedPotential(BasePotential):
 def vector_field_estimator_based_potential(
     vector_field_estimator: ConditionalVectorFieldEstimator,
     prior: Optional[Distribution],
-    x_o: Optional[Tensor],
+    x_o: _DeprecatedXo = _UNSET,
     enable_transform: bool = True,
     **kwargs,
 ) -> Tuple[VectorFieldBasedPotential, TorchTransform]:
@@ -438,7 +425,7 @@ def vector_field_estimator_based_potential(
     Args:
         vector_field_estimator: The neural network modelling the vector field.
         prior: The prior distribution.
-        x_o: The observed data at which to evaluate the vector field.
+        x_o: Deprecated, will be removed in sbi 0.29. Use `potential_fn.bind(x_o)`.
         enable_transform: Whether to enable transforms. Not supported yet.
         **kwargs: Additional keyword arguments passed to
             `VectorFieldBasedPotential`.

@@ -500,11 +500,9 @@ def _build_gaussian_score_estimator(
         embedding_net=torch.nn.Identity(),
     )(building_thetas, building_xs)
 
-    score_fn, _ = vector_field_estimator_based_potential(
-        score_estimator, prior=None, x_o=torch.ones((1,))
-    )
+    score_fn, _ = vector_field_estimator_based_potential(score_estimator, prior=None)
 
-    return score_fn
+    return score_fn.bind(torch.ones((1,)))
 
 
 def test_langevin_corrector_scores_at_current_time():

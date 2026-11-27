@@ -120,14 +120,14 @@ def test_c2st_sre_on_linearGaussian(
         num_samples=num_samples,
     )
     potential_fn, theta_transform = ratio_estimator_based_potential(
-        ratio_estimator=ratio_estimator, prior=prior, x_o=x_o
+        ratio_estimator=ratio_estimator, prior=prior
     )
     posterior = MCMCPosterior(
         potential_fn=potential_fn,
         theta_transform=theta_transform,
         proposal=prior,
         **asdict(mcmc_params_accurate),
-    )
+    ).set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
@@ -188,14 +188,14 @@ def test_c2st_nre_variants_on_linearGaussian_with_multiple_trials(
     x = simulator(theta)
     ratio_estimator = inference.append_simulations(theta, x).train(**train_kwargs)
     potential_fn, theta_transform = ratio_estimator_based_potential(
-        ratio_estimator=ratio_estimator, prior=prior, x_o=x_o
+        ratio_estimator=ratio_estimator, prior=prior
     )
     posterior = MCMCPosterior(
         potential_fn=potential_fn,
         theta_transform=theta_transform,
         proposal=prior,
         **asdict(mcmc_params_accurate),
-    )
+    ).set_default_x(x_o)
     samples = posterior.sample(sample_shape=(num_samples,))
 
     # Get posterior samples.
@@ -281,25 +281,25 @@ def test_c2st_multi_round_snr_on_linearGaussian_vi(
     x = simulator(theta)
     ratio_estimator = inference.append_simulations(theta, x).train()
     potential_fn, theta_transform = ratio_estimator_based_potential(
-        prior=prior, ratio_estimator=ratio_estimator, x_o=x_o
+        prior=prior, ratio_estimator=ratio_estimator
     )
     posterior1 = VIPosterior(
         potential_fn=potential_fn,
         theta_transform=theta_transform,
-    )
+    ).set_default_x(x_o)
     posterior1.train()
 
     theta = posterior1.sample((num_simulations_per_round,))
     x = simulator(theta)
     ratio_estimator = inference.append_simulations(theta, x).train()
     potential_fn, theta_transform = ratio_estimator_based_potential(
-        prior=prior, ratio_estimator=ratio_estimator, x_o=x_o
+        prior=prior, ratio_estimator=ratio_estimator
     )
     posterior = VIPosterior(
         potential_fn=potential_fn,
         theta_transform=theta_transform,
         q=posterior1,
-    )
+    ).set_default_x(x_o)
     posterior.train()
 
     samples = posterior.sample(sample_shape=(num_samples,))
@@ -376,10 +376,12 @@ def test_api_sre_sampling_methods(
     x = simulator(theta)
     ratio_estimator = inference.append_simulations(theta, x).train(max_num_epochs=5)
     potential_fn, theta_transform = ratio_estimator_based_potential(
-        ratio_estimator=ratio_estimator, prior=prior, x_o=x_o
+        ratio_estimator=ratio_estimator, prior=prior
     )
     if sample_with == "rejection":
-        posterior = RejectionPosterior(potential_fn=potential_fn, proposal=prior)
+        posterior = RejectionPosterior(
+            potential_fn=potential_fn, proposal=prior
+        ).set_default_x(x_o)
     elif (
         "slice" in sampling_method
         or "nuts" in sampling_method
@@ -391,19 +393,19 @@ def test_api_sre_sampling_methods(
             proposal=prior,
             theta_transform=theta_transform,
             **asdict(mcmc_params_fast),
-        )
+        ).set_default_x(x_o)
     elif sample_with == "importance":
         posterior = ImportanceSamplingPosterior(
             potential_fn,
             proposal=prior,
             theta_transform=theta_transform,
-        )
+        ).set_default_x(x_o)
     else:
         posterior = VIPosterior(
             potential_fn=potential_fn,
             theta_transform=theta_transform,
             vi_method=sampling_method,
-        )
+        ).set_default_x(x_o)
         posterior.train(max_num_iters=10)
 
     posterior.sample(sample_shape=(num_samples,), show_progress_bars=False)

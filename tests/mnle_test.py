@@ -161,11 +161,11 @@ def test_mnle_accuracy_with_different_samplers_and_trials(
     # True posterior samples
     transform = mcmc_transform(mnle_prior)
     true_posterior_samples = MCMCPosterior(
-        BinomialGammaPotential(mnle_prior, atleast_2d(x_o)),
+        BinomialGammaPotential(mnle_prior),
         theta_transform=transform,
         proposal=mnle_prior,
         **asdict(mcmc_params_accurate),
-    ).sample((num_samples,), show_progress_bars=False)
+    ).sample((num_samples,), x=atleast_2d(x_o), show_progress_bars=False)
 
     posterior = mnle_trained_accurate.build_posterior(
         prior=mnle_prior,
@@ -195,20 +195,11 @@ class BinomialGammaPotential(BasePotential):
     def __init__(
         self,
         prior: Distribution,
-        x_o: Tensor,
         concentration_scaling: Union[Tensor, float] = 1.0,
         device="cpu",
     ):
-        super().__init__(prior, x_o, device)
-
-        # concentration_scaling needs to be a float or match the batch size
-        if isinstance(concentration_scaling, Tensor):
-            num_trials = x_o.shape[0]
-            assert concentration_scaling.shape[0] == num_trials
-
-            # Reshape to match convention (batch_size, num_trials, *event_shape)
-            concentration_scaling = concentration_scaling.reshape(1, num_trials, -1)
-
+        super().__init__(prior, device=device)
+        # A float, or one value per trial of the bound `x_o`.
         self.concentration_scaling = concentration_scaling
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
@@ -222,6 +213,11 @@ class BinomialGammaPotential(BasePotential):
     def iid_likelihood(self, theta: Tensor) -> Tensor:
         batch_size = theta.shape[0]
         num_trials = self.x_o.shape[0]
+        concentration_scaling = self.concentration_scaling
+        if isinstance(concentration_scaling, Tensor):
+            assert concentration_scaling.shape[0] == num_trials
+            # Match the convention (batch_size, num_trials, *event_shape).
+            concentration_scaling = concentration_scaling.reshape(1, num_trials, -1)
         theta = theta.reshape(batch_size, 1, -1)
         # We assume the InverseGamma to be in the first position of theta.
         # And potentially multiple Binomials in the rest.
@@ -242,7 +238,7 @@ class BinomialGammaPotential(BasePotential):
         )
 
         logprob_rts = InverseGamma(
-            concentration=self.concentration_scaling * torch.ones_like(beta), rate=beta
+            concentration=concentration_scaling * torch.ones_like(beta), rate=beta
         ).log_prob(self.x_o[:, :1].reshape(1, num_trials, -1))
 
         # sum across parameter dimensions.
@@ -305,9 +301,7 @@ def test_mnle_with_experimental_conditions(
     )
     prior_transform = mcmc_transform(prior)
     true_posterior_samples = MCMCPosterior(
-        BinomialGammaPotential(
-            prior, atleast_2d(x_o), concentration_scaling=condition_o
-        ),
+        BinomialGammaPotential(prior, concentration_scaling=condition_o),
         theta_transform=prior_transform,
         proposal=prior,
         **asdict(mcmc_params_accurate),
@@ -318,9 +312,9 @@ def test_mnle_with_experimental_conditions(
     trainer = MNLE(proposal, estimator_fun)
     estimator = trainer.append_simulations(theta, x).train()
 
-    potential_fn, _ = likelihood_estimator_based_potential(estimator, proposal, x_o)
+    potential_fn, _ = likelihood_estimator_based_potential(estimator, proposal)
     # The reference prior differs from the proposal used for training.
-    conditioned_potential_fn = potential_fn.condition_on_theta(
+    conditioned_potential_fn = potential_fn.bind(x_o).condition_on_theta(
         condition_o,
         dims_global_theta=[_ for _ in range(last_idx_parameters)],
         prior=prior,
@@ -493,11 +487,9 @@ def test_conditioned_potential_adds_prior_of_global_theta(mnle_with_conditions, 
         potential_prior, prior, dims = proposal, gamma_1, [0]
         expected_prior = Independent(gamma_1, 1)
 
-    potential_fn, _ = likelihood_estimator_based_potential(
-        estimator, potential_prior, x_o
-    )
+    potential_fn, _ = likelihood_estimator_based_potential(estimator, potential_prior)
     local_dims = [dim for dim in range(3) if dim not in dims]
-    conditioned_potential_fn = potential_fn.condition_on_theta(
+    conditioned_potential_fn = potential_fn.bind(x_o).condition_on_theta(
         theta_o[:, local_dims], dims, prior=prior
     )
 
@@ -515,7 +507,7 @@ def test_conditioned_potential_without_marginal_prior_raises(mnle_with_condition
     """A prior without a marginal over the sampled parameters needs `prior`."""
     _, estimator, theta_o, x_o = mnle_with_conditions
     potential_fn, _ = likelihood_estimator_based_potential(
-        estimator, MultivariateNormal(torch.zeros(3), torch.eye(3)), x_o
+        estimator, MultivariateNormal(torch.zeros(3), torch.eye(3))
     )
     with pytest.raises(ValueError, match="Pass `prior`"):
         potential_fn.condition_on_theta(theta_o[:, 2:], [0, 1])
