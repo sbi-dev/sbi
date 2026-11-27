@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import warnings
 from copy import deepcopy
 from math import floor
 from typing import Any, Callable, Literal, Optional, Self, Tuple, Union
@@ -446,8 +447,7 @@ class RestrictionEstimator:
             reweigh_factor=reweigh_factor,
         )
 
-        prior_device = infer_tensor_device(self._prior) or "cpu"
-        return RestrictedPrior(self._prior, accept_reject_fn, device=prior_device)
+        return RestrictedPrior(self._prior, accept_reject_fn)
 
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         r"""
@@ -483,12 +483,44 @@ class RestrictionEstimator:
         return converged
 
 
+class DensityThresholder:
+    r"""True for $\theta$ whose log-probability under `dist` reaches a threshold.
+
+    Args:
+        dist: Distribution with `.log_prob()`.
+        log_prob_threshold: Lowest log-probability at which $\theta$ is accepted.
+    """
+
+    def __init__(self, dist: Any, log_prob_threshold: float) -> None:
+        self._dist = dist
+        # A float has no device, so the comparison works wherever `dist` is.
+        self._log_prob_threshold = log_prob_threshold
+
+    def __call__(self, theta: Tensor) -> Tensor:
+        log_probs = self._dist.log_prob(theta)
+        # Inclusive, since a flat density puts every sample at the threshold, but
+        # never at zero density: float rounding can make the threshold -inf.
+        return (log_probs >= self._log_prob_threshold) & (log_probs > float("-inf"))
+
+    def to(self, device: Union[str, torch.device]) -> Self:
+        """Move `dist` to `device`, if it is a `Distribution` or has `to()`.
+
+        Args:
+            device: Device to move `dist` to.
+
+        Returns:
+            The thresholder itself.
+        """
+        self._dist = move_distribution_to_device(self._dist, process_device(device))
+        return self
+
+
 def get_density_thresholder(
     dist: Any,
     quantile: float = 1e-4,
     num_samples_to_estimate_support: int = 1_000_000,
-) -> Callable:
-    """Returns function that thresholds a density at a particular `1-quantile`.
+) -> DensityThresholder:
+    r"""Return a thresholder of a density at a particular `1-quantile`.
 
     Reference:
     Deistler et al. (2022): "Truncated proposals for scalable and hassle-free
@@ -505,22 +537,39 @@ def get_density_thresholder(
             but slower.
 
     Returns:
-        Callabe which is true for $\theta$ in the `1-quantile` high-probability region
-        of the `dist`.
+        `DensityThresholder`, a callable which is true for $\theta$ in the
+        `1-quantile` high-probability region of `dist`. Its `to()` moves `dist`.
+
+    Raises:
+        ValueError: If `quantile` is not in [0, 1),
+            `num_samples_to_estimate_support` is smaller than 1, `dist.log_prob()`
+            returns more than one value per sample or gives none of its own samples a
+            positive density.
     """
+    if not 0.0 <= quantile < 1.0 or num_samples_to_estimate_support < 1:
+        raise ValueError(
+            "`quantile` must be in [0, 1) and `num_samples_to_estimate_support` at "
+            f"least 1, got {quantile} and {num_samples_to_estimate_support}."
+        )
     samples = dist.sample((num_samples_to_estimate_support,))
     log_probs = dist.log_prob(samples)
+    if log_probs.numel() != num_samples_to_estimate_support:
+        raise ValueError(
+            "`dist.log_prob()` must return one value per sample, got shape "
+            f"{tuple(log_probs.shape)}. Wrap a batched distribution in "
+            "`torch.distributions.Independent`."
+        )
+    # A 1D distribution can return shape (N, 1), which `torch.sort` would not sort.
+    log_probs = log_probs.reshape(-1)
+    # NaN sorts last and could become the cutoff at a high quantile.
+    log_probs = log_probs[~torch.isnan(log_probs)]
+    if not (log_probs > float("-inf")).any():
+        raise ValueError(
+            "`dist.log_prob()` gives none of its own samples a positive density."
+        )
     sorted_log_probs, _ = torch.sort(log_probs)
-    log_prob_threshold = sorted_log_probs[
-        int(quantile * num_samples_to_estimate_support)
-    ]
-
-    def density_thresholder(theta: Tensor) -> Tensor:
-        theta_log_probs = dist.log_prob(theta)
-        predictions = theta_log_probs > log_prob_threshold
-        return predictions.bool()
-
-    return density_thresholder
+    log_prob_threshold = sorted_log_probs[int(quantile * log_probs.numel())].item()
+    return DensityThresholder(dist, log_prob_threshold)
 
 
 class AcceptRejectFunction:
@@ -645,7 +694,7 @@ class RestrictedPrior(Distribution):
         accept_reject_fn: Callable,
         posterior: Optional[Any] = None,
         sample_with: str = "rejection",
-        device: str = "cpu",
+        device: Optional[str] = None,
     ) -> None:
         r"""Initialize the simulation-informed prior.
 
@@ -664,23 +713,46 @@ class RestrictedPrior(Distribution):
             sample_with: Either of [`rejection`|`sir`]. Sets that method that is used
                 to sample from the restricted prior. If `sir`, youu must have passed
                 a `posterior` at initialization.
-            device: Device used for sampling and evaluating.
+            device: Deprecated and ignored. The restricted prior uses the device of
+                its prior; move it with `to()`.
         """
         super().__init__(validate_args=False)
         self._prior = prior
         self._accept_reject_fn = accept_reject_fn
         self._posterior = posterior  # Only used for SIR.
         self._sample_with = sample_with
-        self._device = process_device(device)
         self.acceptance_rate = None  # Only defined for rejection sampling.
+        if device is not None:
+            warnings.warn(
+                "The `device` argument of `RestrictedPrior` is deprecated and ignored. "
+                "The restricted prior uses the device of its prior; move it with "
+                "`.to(device)`.",
+                FutureWarning,
+                stacklevel=2,
+            )
+
+    @property
+    def _device(self) -> str:
+        """Device of the prior's tensors, or the CPU for a prior without tensors."""
+        return infer_tensor_device(self._prior) or "cpu"
+
+    @property
+    def batch_shape(self) -> torch.Size:
+        """Batch shape of the prior."""
+        return getattr(self._prior, "batch_shape", torch.Size())
+
+    @property
+    def event_shape(self) -> torch.Size:
+        """Event shape of the prior."""
+        return getattr(self._prior, "event_shape", torch.Size())
 
     def to(self, device: Union[str, torch.device]) -> Self:
         """Move the restricted prior to `device` in place.
 
-        Moves the prior and the posterior used for `sir`. The classifier of an
-        `AcceptRejectFunction` stays on its device and evaluates parameters from any
-        device. A user's own accept/reject callable, e.g. from
-        `get_density_thresholder()`, is not moved.
+        Moves the prior, the posterior used for `sir`, and an accept/reject callable
+        that has a `to()` method, e.g. the one from `get_density_thresholder()`. The
+        classifier of an `AcceptRejectFunction` stays on its device and evaluates
+        parameters from any device.
 
         Args:
             device: Device to move the restricted prior to.
@@ -689,15 +761,30 @@ class RestrictedPrior(Distribution):
             The restricted prior itself.
         """
         device = process_device(device)
+        # First: a user callable that refuses the device leaves the prior in place.
+        self._accept_reject_fn = move_distribution_to_device(
+            self._accept_reject_fn, device
+        )
         self._prior = move_distribution_to_device(self._prior, device)
-        if isinstance(self._posterior, Distribution):
-            self._posterior = move_distribution_to_device(self._posterior, device)
-        elif self._posterior is not None:
-            self._posterior.to(device)
+        self._posterior = move_distribution_to_device(self._posterior, device)
         self.acceptance_rate = move_tensors(self.acceptance_rate, device)
-        # Set last: if the prior cannot move, the restricted prior keeps its device.
-        self._device = device
         return self
+
+    def __setstate__(self, state: dict) -> None:
+        """Set the state when being loaded from pickle.
+
+        `torch.load(..., map_location=...)` remaps the tensors but not a device string
+        the prior keeps, e.g. that of a `BoxUniform`, so the prior moves to where its
+        tensors are. Other objects may not be restored yet, so they are not touched.
+
+        Args:
+            state: State to be restored.
+        """
+        state.pop("_device", None)  # Stored by older versions; now read from the prior.
+        self.__dict__.update(state)
+        prior_device = infer_tensor_device(self._prior)
+        if prior_device is not None:
+            self._prior = move_distribution_to_device(self._prior, prior_device)
 
     def sample(
         self,
