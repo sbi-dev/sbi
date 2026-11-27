@@ -6,6 +6,16 @@
 
 * **`PermutationInvariantEmbedding` passes log(1 + N) instead of the trial count N** ([#2113](https://github.com/sbi-dev/sbi/pull/2113)): the embedding appended the raw number of real trials N to the aggregated trial embedding before its fully connected net. With 100 trials, that input was about 100 next to inputs of order 1, which scales badly when the number of trials varies. It now appends log(1 + N), which is 0 for an observation without real trials.
   * A network trained before this change gives different outputs after it, also when it was saved with `save()` or pickled whole, because the forward pass changed. Retrain it.
+* **Guided and iid sampling of vector field posteriors gives different samples** ([#2111](https://github.com/sbi-dev/sbi/pull/2111)): guidance now uses the score instead of the velocity of FMPE, and iid methods combine the observations before guidance applies. FMPE and Simformer flow matching use the corrected score and diffusion (a factor 1 + `noise_scale`), and all their SDE functions clamp time at `effective_t_max` (0.99), also `score` and `std_fn`. The `gauss` iid method now keeps its combined precision positive definite by default, as `auto_gauss` and `jac_gauss` do. `prior_guide` takes one backward pass per parameter dimension and sampling step, for the Jacobian of the score.
+* **`sample()` raises for ODE sampling with iid data or guidance** ([#2111](https://github.com/sbi-dev/sbi/pull/2111)): the ODE sampler cannot use them and ignored them before. Build the posterior with `sample_with="sde"`.
+
+### ⚠️ Deprecations
+
+* **The per-call `effective_t_max` argument of the flow matching SDE functions** ([#2111](https://github.com/sbi-dev/sbi/pull/2111)): `drift_fn`, `diffusion_fn` and `mean_t_fn` warn when it is passed. Set the attribute `effective_t_max` of the estimator instead, which all SDE functions use.
+
+### 🐛 Bug Fixes
+
+* **Guided and iid sampling of vector field posteriors** ([#2111](https://github.com/sbi-dev/sbi/pull/2111)): iid data with guidance counted the guidance once per observation; `prior_guide` follows its paper for any SDE; interval guidance raises for invalid bounds; the positive definite guard of the iid methods no longer biases the score of well-posed problems, whatever the scale of the parameters; the denoising fallback for priors without a closed form works for priors of two or more dimensions.
 
 ## v0.27.0
 
