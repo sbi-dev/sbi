@@ -1772,8 +1772,9 @@ def _sbc_rank_plot(
             all in one.
         show_ylabel: whether to show ylabels and ticks.
         sharey: whether to share the y-labels, ticks, and limits across subplots.
-        fig: figure object to plot in.
-        ax: axis object, must contain as many sublpots as parameters or len(ranks).
+        fig: figure object to plot in, defaults to the figure of `ax`.
+        ax: Axes to plot in: a single Axes, or an array with at least as many
+            subplots as parameters when they are plotted in separate subplots.
         figsize: dimensions of figure object, default (8, 5) or (len(ranks) * 4, 5).
 
     Returns:
@@ -1844,7 +1845,7 @@ def _sbc_rank_plot(
 
     # Plot one row subplot for each parameter, different "methods" on top of each other.
     if params_in_subplots:
-        if fig is None or ax is None:
+        if ax is None:
             fig, ax = plt.subplots(
                 num_rows,
                 min(num_parameters, num_cols),
@@ -1858,6 +1859,8 @@ def _sbc_rank_plot(
                 "There must be at least as many subplots as parameters."
             )
             num_rows = ax.shape[0] if ax.ndim > 1 else 1
+            if fig is None:
+                fig = ax.flat[0].figure
         assert ax is not None
 
         col_idx, row_idx = 0, 0
@@ -1922,8 +1925,10 @@ def _sbc_rank_plot(
     # When there is only one set of ranks show all params in a single subplot.
     # Only "cdf" and "cdf-diff" get here: "hist" always uses subplots.
     else:
-        if fig is None or ax is None:
+        if ax is None:
             fig, ax = plt.subplots(1, 1, figsize=figsize)
+        elif fig is None:
+            fig = ax.figure
 
         plt.sca(ax)
         ranki = ranks_list[0]
