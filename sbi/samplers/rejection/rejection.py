@@ -12,7 +12,7 @@ from torch import Tensor, as_tensor
 
 from sbi.sbi_types import AcceptRejectFn, Proposal, SampleProposal
 from sbi.utils.pbar import is_nested, nested_pbar_context, sampling_desc, tqdm
-from sbi.utils.sbiutils import gradient_ascent
+from sbi.utils.sbiutils import gradient_ascent, proposal_log_prob
 
 logger = logging.getLogger(__name__)
 
@@ -85,8 +85,8 @@ def rejection_sample(
     # One value per sample: a 1-D proposal without `Independent` returns (N, 1).
     def potential_over_proposal(theta):
         num_theta = theta.shape[0]
-        return potential_fn(theta).reshape(num_theta) - proposal.log_prob(
-            theta
+        return potential_fn(theta).reshape(num_theta) - proposal_log_prob(
+            proposal, theta
         ).reshape(num_theta)
 
     # Search for the maximum of the ratio.
@@ -122,12 +122,12 @@ def rejection_sample(
             """
             return self.proposal.sample((sample_shape,), **kwargs)
 
-        def log_prob(self, theta: Tensor, **kwargs) -> Tensor:
+        def log_prob(self, theta: Tensor) -> Tensor:
             """
             The log-prob is scaled such that the proposal is always above the potential.
             """
             return (
-                self.proposal.log_prob(theta, **kwargs)
+                proposal_log_prob(self.proposal, theta)
                 + self.max_log_ratio
                 + self.log_m
             )
@@ -185,7 +185,7 @@ def rejection_sample(
 
             target_proposal_ratio = torch.exp(
                 potential_fn(candidates).reshape(sampling_batch_size)
-                - proposal.log_prob(candidates).reshape(sampling_batch_size)
+                - proposal_log_prob(proposal, candidates).reshape(sampling_batch_size)
             )
             uniform_rand = torch.rand(target_proposal_ratio.shape).to(device)
             samples = candidates[target_proposal_ratio > uniform_rand]

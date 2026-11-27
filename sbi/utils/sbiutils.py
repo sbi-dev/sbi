@@ -1464,3 +1464,26 @@ def seed_all_backends(seed: Optional[Union[int, Tensor]] = None) -> None:
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True  # type: ignore
     torch.backends.cudnn.benchmark = False  # type: ignore
+
+
+def proposal_log_prob(proposal: Any, theta: Tensor) -> Tensor:
+    """Returns the log-density of `theta` under a proposal of a sampler.
+
+    MCMC and rejection posteriors only evaluate the log-probability up to a
+    normalizing constant, their `potential()`. Rejection and importance sampling
+    cancel that constant, so it serves as the proposal's log-density.
+
+    Args:
+        proposal: Proposal with a `log_prob()`, or an MCMC or rejection posterior.
+        theta: Parameters to evaluate.
+
+    Returns:
+        Log-density of `theta` under the proposal, up to a constant for MCMC and
+        rejection posteriors.
+    """
+    from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
+    from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
+
+    if isinstance(proposal, (MCMCPosterior, RejectionPosterior)):
+        return proposal.potential(theta)
+    return proposal.log_prob(theta)
