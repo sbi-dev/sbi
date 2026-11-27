@@ -175,6 +175,13 @@ def test_batched_sample_log_prob_with_different_x(
         assert log_probs_2d.shape == (1, x_o_batch_dim), "2D theta logprob shape wrong"
         assert torch.allclose(log_probs_2d[0], batched_log_probs[0], atol=1e-1)
 
+        # Several sample axes give the values of the flat call.
+        theta_4d = samples.reshape(2, 5, *samples.shape[1:])
+        log_probs_4d = posterior.log_prob_batched(theta_4d, x_o)
+        assert torch.allclose(
+            log_probs_4d, batched_log_probs.reshape(2, 5, -1), atol=1e-4
+        ), "Several sample axes give other values than the flat call."
+
     # Test consistency with non-batched log_prob
     # NOTE: Leakage factor is a MC estimate, so we need to relax the tolerance here.
     if x_o_batch_dim == 0:
