@@ -21,7 +21,8 @@ This is called leakage. In multi-round NPE, leakage can grow with every round, a
 estimate then becomes poor inside the prior bounds as well. With a mixture density
 network, training can eventually fail with NaN values. `log_prob()` shows the same
 leakage: it estimates its normalizing constant from the fraction of samples within the
-prior bounds, and warns when this fraction is small. The reason for leakage is
+prior bounds, and warns when this fraction is small. If none of its draws lies inside
+the prior bounds, `log_prob()` returns NaN inside them. The reason for leakage is
 described in more detail
 [here](https://arxiv.org/abs/2210.04815),
 [here](https://arxiv.org/abs/2002.03712), and

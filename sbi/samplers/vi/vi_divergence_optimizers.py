@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import warnings
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from typing import Callable, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
@@ -116,7 +118,7 @@ class DivergenceOptimizer(ABC):
 
         self.n_particles = n_particles
         self.clip_value = clip_value
-        self.learning_rate = kwargs.get("lr", 1e-3)
+        self.learning_rate = kwargs.setdefault("lr", 1e-3)
         self.retain_graph = kwargs.get("retain_graph", False)
         self._kwargs = kwargs
 
@@ -149,12 +151,13 @@ class DivergenceOptimizer(ABC):
         scheduler_kwargs = filter_kwargs_for_func(scheduler.__init__, kwargs)
 
         self._optimizer = optimizer(self.q.parameters(), **opt_kwargs)
+        # Its state before any step, to restore on a rollback.
+        self._fresh_optimizer_state = deepcopy(self._optimizer.state_dict())
         self._scheduler = scheduler(self._optimizer, **scheduler_kwargs)
         # Loss and summary
         self.eps = eps
         self.num_step = 0
         self._num_updates = 0
-        self._rolled_back = False
         self.warm_up_was_done = False
         self.losses = torch.ones(2000)
         self.moving_average = torch.ones(2000)
@@ -238,8 +241,16 @@ class DivergenceOptimizer(ABC):
         """
         for state_para, para in zip(self.state_dict, self.q.parameters(), strict=False):
             para.data = state_para.data.clone().to(para.device)
-        self._optimizer.__init__(self.q.parameters(), self.learning_rate)
-        self.warm_up(warm_up_rounds)
+        # The state from before any step (Adagrad builds one in its constructor), a
+        # copy as the optimizer updates it in place, with the current settings,
+        # including a scheduler's. The live parameter groups stay.
+        param_groups = self._optimizer.param_groups
+        optimizer_state = deepcopy(self._fresh_optimizer_state)
+        optimizer_state["param_groups"] = self._optimizer.state_dict()["param_groups"]
+        self._optimizer.load_state_dict(optimizer_state)
+        self._optimizer.param_groups = param_groups
+        if self.prior is not None:
+            self.warm_up(warm_up_rounds)
 
     def loss(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
         """Computes the loss function which is optimized.
@@ -264,16 +275,24 @@ class DivergenceOptimizer(ABC):
         self._optimizer.zero_grad()
         surrogate_loss, loss = self.loss(x_o.to(self.device))
         surrogate_loss.backward(retain_graph=self.retain_graph)
-        self._rolled_back = not torch.isfinite(surrogate_loss)
-        if self._rolled_back:
+        grad_norm = nn.utils.clip_grad.clip_grad_norm_(
+            self.q.parameters(), self.clip_value
+        )
+        # A finite surrogate can have nan gradients, e.g. from a potential
+        # `log(density * mask)` for a particle outside the support.
+        rolled_back = not (torch.isfinite(surrogate_loss) and torch.isfinite(grad_norm))
+        if rolled_back:
             self.resolve_state()
-        nn.utils.clip_grad.clip_grad_norm_(self.q.parameters(), self.clip_value)
-        self._optimizer.step()
+            # q restarts towards the prior, so its earlier losses no longer apply.
+            self._clear_loss_stats()
+        else:
+            self._optimizer.step()
+            self.update_loss_stats(loss.cpu())
         self._scheduler.step()
-        self.update_loss_stats(loss.cpu())
-        # Counted apart from num_step, which skips non-finite losses.
+        # Counted apart from num_step, which skips non-finite losses and restarts on a
+        # rollback. A rolled-back q is no snapshot.
         self._num_updates += 1
-        if (self._num_updates % 50) == 0:
+        if not rolled_back and (self._num_updates % 50) == 0:
             self.update_state()
 
     def converged(self, considered_values: int = 50) -> bool:
@@ -287,8 +306,7 @@ class DivergenceOptimizer(ABC):
             bool: True if converged, else false.
 
         """
-        # After a rollback, q was just reset and warmed up towards the prior.
-        if self._rolled_back or self.num_step < considered_values:
+        if self.num_step < considered_values:
             return False
         else:
             m = self.moving_slope[
@@ -297,13 +315,19 @@ class DivergenceOptimizer(ABC):
             return abs(m).item() < self.eps
 
     def reset_loss_stats(self) -> None:
-        """This will reset the loss statistics."""
+        """Resets the loss statistics, and restarts the snapshot schedule from the
+        current q."""
+        self._clear_loss_stats()
+        self._num_updates = 0
+        # Rebuilt, as `update` may have swapped q for one with other parameters.
+        self.state_dict = [para.data.clone() for para in self.q.parameters()]
+
+    def _clear_loss_stats(self) -> None:
         self.losses = torch.ones(2000)
         self.moving_average = torch.ones(2000)
         self.moving_std = torch.ones(2000)
         self.moving_slope = torch.ones(2000)
         self.num_step = 0
-        self._num_updates = 0
 
     def update_loss_stats(self, loss: Tensor, window: int = 20) -> None:
         """Updates current loss statistics of the optimizer
@@ -388,6 +412,7 @@ class DivergenceOptimizer(ABC):
         scheduler_kwargs = filter_kwargs_for_func(sched_type.__init__, kwargs)
 
         self._optimizer = opt_type(self.q.parameters(), **opt_kwargs)
+        self._fresh_optimizer_state = deepcopy(self._optimizer.state_dict())
         self._scheduler = sched_type(self._optimizer, **scheduler_kwargs)
 
 
@@ -569,9 +594,18 @@ class IWElboOptimizer(ElboOptimizer):
         elbo_particles = self.generate_elbo_particles(x_o, self.n_particles * self.K)
         elbo_particles = elbo_particles.reshape(self.n_particles, self.K)
         weights = self.get_importance_weight(elbo_particles.clone().detach())
-        surrogate_loss = -(weights * elbo_particles).sum(-1).mean(0)
-        loss = -(torch.logsumexp(elbo_particles, dim=-1) - np.log(self.K)).mean()
-        return surrogate_loss, loss.clone().detach()
+        # Outside the support, the weight is 0: 0 * log 0 = 0, not 0 * -inf = nan. A
+        # group with every particle outside has no estimate and is left out; with no
+        # group left, the loss is nan and the step rolls back.
+        outside = torch.isneginf(elbo_particles.detach())
+        empty = outside.all(-1, keepdim=True)
+        weights = torch.where(empty, 0.0, weights)
+        elbo_particles_masked = torch.where(outside, 0.0, elbo_particles)
+        num_groups = (~empty).sum()
+        surrogate_loss = -(weights * elbo_particles_masked).sum() / num_groups
+        bounds = torch.logsumexp(elbo_particles.detach(), -1, keepdim=True)
+        loss = -torch.where(empty, 0.0, bounds - np.log(self.K)).sum() / num_groups
+        return surrogate_loss, loss
 
     def get_importance_weight(self, elbo_particles: Tensor) -> Tensor:
         """Generates importance weights in a numerically stable fashion.
@@ -679,6 +713,10 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
     NOTE: For alpha < 1 the divergence is more mass covering, for alpha > 1 the
     divergence is more mode seeking.
 
+    NOTE: For alpha >= 1, a particle where the potential is -inf (outside the support)
+    makes the alpha loss nan, so the step rolls back, as for the reverse KL. Use
+    alpha < 1 for such potentials.
+
     NOTE: For small alpha, you i.e. alpha=0.1 you may require to
     turn on stick_the_landing or dreg.
 
@@ -701,8 +739,11 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
             alpha: Determines the alpha divergence to which is used. For alpha < 1 the
                 divergence is more mass covering, for alpha > 1 the divergence is more
                 mode seeking.
-            unbiased: We use the biased bound as proposed in [1], but one can also use
-                an unbiased one.
+            unbiased: Deprecated since v0.28.0, removed in v0.30.0. Instead of the
+                biased estimate of the bound [1], use an unbiased estimate of
+                exp((1 - alpha) * bound). Its gradient is the biased one, scaled by
+                (1 - alpha) times that estimate, so the step size depends on the
+                potential's normalizing constant. Only for alpha < 1.
             dreg: Doubly reparmeterized gradient estimator as proposed in [2]. It is
                 based on the `reduced_variance` already present, but leads to an
                 unbiased estimate on this objective in contrast.
@@ -734,8 +775,25 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
             return self.loss_alpha_unbiased(xo)
 
     def loss_alpha_unbiased(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
-        """Unbiased estimate of a surrogate RVB"""
-        elbo_particles = self.generate_elbo_particles(x_o) * (1 - self.alpha)
+        """Unbiased estimate of a surrogate RVB.
+
+        Raises:
+            ValueError: If alpha >= 1.
+        """
+        if self.alpha >= 1:
+            raise ValueError(
+                f"`unbiased=True` needs alpha < 1, got alpha={self.alpha}: for "
+                "alpha > 1 the estimate can be infinite, for alpha = 1 constant."
+            )
+        warnings.warn(
+            "`unbiased=True` is deprecated since sbi v0.28.0 and will be removed in "
+            "v0.30.0: its gradient is the biased one, scaled by a factor that "
+            "overflows or underflows for unnormalized potentials. Use "
+            "`unbiased=False`.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        elbo_particles = self.generate_elbo_particles(x_o)
         _, mean_log_weights = self.get_importance_weight(elbo_particles)
         surrogate_loss = -torch.exp(mean_log_weights)
         loss = -mean_log_weights / (1 - self.alpha)
@@ -747,8 +805,15 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
         weights, mean_log_weights = self.get_importance_weight(
             elbo_particles.clone().detach()
         )
-        surrogate_loss = -torch.mean(weights * elbo_particles)
-        loss = -mean_log_weights / (1 - self.alpha)
+        # Outside the support, the weight is 0: 0 * log 0 = 0, not 0 * -inf = nan.
+        # For alpha >= 1 it is nan there, so the step rolls back.
+        outside = (weights == 0) & torch.isneginf(elbo_particles.detach())
+        elbo_particles_masked = torch.where(outside, 0.0, elbo_particles)
+        surrogate_loss = -torch.mean(weights * elbo_particles_masked)
+        if self.alpha == 1:  # The bound is the ELBO, where the formula gives 0 / 0.
+            loss = -elbo_particles.detach().mean()
+        else:
+            loss = -mean_log_weights / (1 - self.alpha)
         return surrogate_loss, loss
 
     def get_importance_weight(self, elbo_particles: Tensor) -> Tuple[Tensor, Tensor]:

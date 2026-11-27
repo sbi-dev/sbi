@@ -975,22 +975,192 @@ def test_non_finite_losses_are_left_out_of_loss_stats():
     )
 
 
-def test_rolled_back_step_does_not_end_training(monkeypatch):
-    """A non-finite gradient loss rolls q back and warms it up towards the prior, so
-    training must not stop on that step."""
+@pytest.mark.parametrize("surrogate", ["nan", "nan gradient"])
+def test_rolled_back_step_does_not_end_training(monkeypatch, surrogate: str):
+    """A non-finite gradient loss, or a finite one with nan gradients (as from a
+    potential `log(density * mask)`), rolls q back and warms it up towards the prior.
+    The step makes no update with those gradients, restarts the loss statistics, and
+    counts towards the snapshot schedule without a snapshot of the rolled-back q."""
     optimizer = _optimizer_after_losses([2.0] * 60)
     assert optimizer.converged()
 
-    param = next(optimizer.q.parameters())
-    nan_surrogate = lambda x_o: (param.sum() * float("nan"), torch.tensor(2.0))
-    monkeypatch.setattr(optimizer, "loss", nan_surrogate)
-    optimizer.step(zeros(1))
-    assert not optimizer.converged()
+    loc = next(optimizer.q.parameters())  # zeros: sqrt has an infinite derivative
+    surrogates = {
+        "nan": lambda: loc.sum() * float("nan"),
+        "nan gradient": lambda: (loc.sqrt() * 0).sum(),
+    }
+    loss = lambda x_o: (surrogates[surrogate](), torch.tensor(2.0))
+    monkeypatch.setattr(optimizer, "loss", loss)
+    resolve_state, recovered = optimizer.resolve_state, []
 
-    finite_surrogate = lambda x_o: (param.sum() * 0 + 2.0, torch.tensor(2.0))
-    monkeypatch.setattr(optimizer, "loss", finite_surrogate)
+    def record_recovery():
+        resolve_state()
+        recovered.extend(p.detach().clone() for p in optimizer.q.parameters())
+
+    monkeypatch.setattr(optimizer, "resolve_state", record_recovery)
+    optimizer._num_updates = 49  # this step is due for a snapshot
+    snapshot = [p.clone() for p in optimizer.state_dict]
     optimizer.step(zeros(1))
-    assert optimizer.converged()
+    assert optimizer.num_step == 0
+    assert optimizer._num_updates == 50
+    for p, p_recovered in zip(optimizer.q.parameters(), recovered, strict=True):
+        assert torch.equal(p, p_recovered)
+    for p_snapshot, p_before in zip(optimizer.state_dict, snapshot, strict=True):
+        assert torch.equal(p_snapshot, p_before)
+
+
+def _loss_and_grads(monkeypatch, optimizer_class, kwargs, noise, outside_value):
+    """Gradient loss and its gradients for fixed reparameterized particles, under a
+    target whose log density is `outside_value` for theta < -1.5."""
+    prior = MultivariateNormal(zeros(1), eye(1))
+    shifted = MultivariateNormal(ones(1), 0.25 * eye(1))
+
+    def target_log_prob(theta):
+        outside = theta[..., 0] < -1.5
+        return torch.where(outside, outside_value, shifted.log_prob(theta))
+
+    target = SimpleNamespace(log_prob=target_log_prob)
+    optimizer = optimizer_class(
+        potential_fn=make_tractable_potential(target, prior),
+        q=LearnableGaussian(dim=1, full_covariance=False),
+        prior=prior,
+        lr=1e-3,
+        gamma=0.999,
+        **kwargs,
+    )
+    q = optimizer.q
+
+    def sample_and_log_prob(sample_shape):
+        # Reparameterized, so gradients also flow through the potential.
+        samples = q.loc + q.log_scale.exp() * torch.tensor(noise).unsqueeze(-1)
+        return samples, q.log_prob(samples)
+
+    monkeypatch.setattr(q, "sample_and_log_prob", sample_and_log_prob)
+    surrogate, _ = optimizer.loss(zeros(1))
+    return surrogate, torch.autograd.grad(surrogate, list(q.parameters()))
+
+
+@pytest.mark.parametrize(
+    "optimizer_class, kwargs",
+    [
+        (IWElboOptimizer, {"n_particles": 3, "K": 2}),
+        (RenyiDivergenceOptimizer, {"n_particles": 6}),
+    ],
+)
+def test_iw_and_alpha_losses_leave_out_particles_outside_the_support(
+    monkeypatch, optimizer_class, kwargs
+):
+    """A particle where the potential is -inf (as a `RestrictedPrior` gives) has
+    weight 0 and adds nothing to the IW or alpha gradient loss (0 * log 0 = 0), as a
+    particle whose weight underflows to 0."""
+    noise = [-2.0, -1.0, 0.0, 0.5, 1.0, 2.0]
+    args = (monkeypatch, optimizer_class, kwargs, noise)
+    surrogate, grads = _loss_and_grads(*args, -torch.inf)
+    surrogate_underflow, grads_underflow = _loss_and_grads(*args, -1e4)
+    assert torch.allclose(surrogate, surrogate_underflow)
+    for grad, grad_underflow in zip(grads, grads_underflow, strict=True):
+        assert torch.isfinite(grad).all()
+        assert torch.allclose(grad, grad_underflow)
+
+
+def test_iw_loss_leaves_out_groups_entirely_outside_the_support(monkeypatch):
+    """An IW group with every particle outside the support has no estimate, so the
+    loss leaves it out, as if it had not been drawn."""
+    inside = [0.0, 0.5, 1.0, 2.0]
+    surrogate, grads = _loss_and_grads(
+        monkeypatch,
+        IWElboOptimizer,
+        {"n_particles": 3, "K": 2},
+        [-2.0, -1.8, *inside],
+        -torch.inf,
+    )
+    surrogate_ref, grads_ref = _loss_and_grads(
+        monkeypatch, IWElboOptimizer, {"n_particles": 2, "K": 2}, inside, -torch.inf
+    )
+    assert torch.allclose(surrogate, surrogate_ref)
+    for grad, grad_ref in zip(grads, grads_ref, strict=True):
+        assert torch.allclose(grad, grad_ref)
+
+
+def test_rollback_keeps_the_optimizer_settings(monkeypatch):
+    """Recovery resets the optimizer's state, not its settings, including those a
+    scheduler has changed, nor hooks registered on it."""
+    prior = MultivariateNormal(zeros(1), eye(1))
+    optimizer = ForwardKLOptimizer(
+        potential_fn=FakePotential(prior=prior),
+        q=LearnableGaussian(dim=1, full_covariance=False),
+        prior=prior,
+        optimizer=torch.optim.SGD,
+        momentum=0.9,
+        weight_decay=0.1,
+        lr=1e-3,
+        gamma=0.999,
+    )
+    monkeypatch.setattr(optimizer, "warm_up", lambda num_steps: None)
+    hook_calls = []
+    optimizer._optimizer.register_step_post_hook(lambda *args: hook_calls.append(1))
+    for p in optimizer.q.parameters():
+        p.grad = torch.ones_like(p)
+    optimizer._optimizer.step()  # fills the momentum buffers
+    settings = optimizer._optimizer.param_groups[0]
+    settings.update(lr=1e-4, momentum=0.5)  # as a scheduler may set them
+    optimizer.resolve_state()
+    assert optimizer._optimizer.param_groups[0] is settings
+    kept = [settings[key] for key in ("lr", "momentum", "weight_decay")]
+    assert kept == [1e-4, 0.5, 0.1]
+    assert not optimizer._optimizer.state
+    optimizer._optimizer.step()
+    assert len(hook_calls) == 2
+
+
+def test_alpha_loss_at_alpha_one_is_the_elbo(monkeypatch):
+    """At alpha = 1 the displayed loss is the negative ELBO, not the formula's 0 / 0,
+    which would never let training converge."""
+    prior = MultivariateNormal(zeros(1), eye(1))
+    optimizer = RenyiDivergenceOptimizer(
+        potential_fn=FakePotential(prior=prior),
+        q=LearnableGaussian(dim=1, full_covariance=False),
+        prior=prior,
+        n_particles=4,
+        alpha=1.0,
+        lr=1e-3,
+        gamma=0.999,
+    )
+    elbo_particles = torch.tensor([-1.0, -2.0, -3.0, -4.0])
+    monkeypatch.setattr(
+        optimizer,
+        "generate_elbo_particles",
+        lambda x_o, num_samples=None: elbo_particles,
+    )
+    _, loss = optimizer.loss(zeros(1))
+    assert torch.allclose(loss, torch.tensor(2.5))
+
+
+def test_optimizer_without_lr_gets_the_default_lr():
+    """Without `lr`, the optimizer gets sbi's default, not torch's (1.0 for
+    Adadelta)."""
+    prior = MultivariateNormal(zeros(1), eye(1))
+    optimizer = ForwardKLOptimizer(
+        potential_fn=FakePotential(prior=prior),
+        q=LearnableGaussian(dim=1, full_covariance=False),
+        prior=prior,
+        optimizer=torch.optim.Adadelta,
+        gamma=0.999,
+    )
+    assert optimizer._optimizer.param_groups[0]["lr"] == 1e-3
+
+
+def test_reset_loss_stats_snapshots_the_current_q():
+    """Each `train` call starts with a snapshot of the current q, so a rollback in it
+    does not restore a q from an earlier call."""
+    optimizer = _optimizer_after_losses([2.0])
+    with torch.no_grad():
+        for p in optimizer.q.parameters():
+            p.add_(1.0)
+    optimizer.reset_loss_stats()
+    q_params = optimizer.q.parameters()
+    for p_snapshot, p in zip(optimizer.state_dict, q_params, strict=True):
+        assert torch.equal(p_snapshot, p)
 
 
 @pytest.mark.parametrize("optimizer_class", [IWElboOptimizer, RenyiDivergenceOptimizer])
