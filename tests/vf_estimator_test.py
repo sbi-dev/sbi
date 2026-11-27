@@ -824,14 +824,25 @@ def test_flow_matching_effective_t_max_argument_is_deprecated(method):
     torch.testing.assert_close(old_call, default_call)
 
 
-@pytest.mark.parametrize("config_cls", CONFIGS)
+def _build_flow_matching(masked: bool, num_dim: int):
+    data = torch.randn(100, num_dim)
+    if masked:
+        return build_masked_flow_matching_estimator(data, data).double()
+    return FlowMatchingConfig().build(data, torch.randn(100, 1)).double()
+
+
+@pytest.mark.parametrize("config_cls", [*CONFIGS, "masked_flow_matching"])
 def test_forward_sde_matches_marginals(config_cls):
     """The forward SDE d theta = f theta dt + g dW reproduces the time marginals.
 
     With marginals N(m(t) theta_0, s(t)^2), this needs dm/dt = f m and
     d(s^2)/dt = 2 f s^2 + g^2. Checked with central differences in float64.
     """
-    estimator = config_cls().build(torch.randn(100, 1), torch.randn(100, 1)).double()
+    if config_cls == "masked_flow_matching":
+        estimator = _build_flow_matching(masked=True, num_dim=1)
+    else:
+        estimator = config_cls().build(torch.randn(100, 1), torch.randn(100, 1))
+        estimator = estimator.double()
     one = torch.ones(1, 1, dtype=torch.float64)
     h = 1e-5
     # Flow matching clamps time at effective_t_max: its SDE is frozen above.
@@ -852,22 +863,23 @@ def test_forward_sde_matches_marginals(config_cls):
         )
 
 
-def test_flow_matching_score_is_the_marginal_score():
+@pytest.mark.parametrize("masked", [False, True])
+def test_flow_matching_score_is_the_marginal_score(masked):
     """With the exact velocity of a Gaussian, `score` is the exact marginal score."""
     dtype = torch.float64
     mean = torch.tensor([0.5, -1.0], dtype=dtype)
     cov = torch.tensor([[0.3, 0.1], [0.1, 0.2]], dtype=dtype)
     eye = torch.eye(2, dtype=dtype)
-    estimator = FlowMatchingConfig().build(torch.randn(100, 2), torch.randn(100, 1))
-    estimator = estimator.double()
+    estimator = _build_flow_matching(masked, num_dim=2)
 
     def marginal(time):
         # theta_t = a theta_0 + b eps with theta_0 ~ N(mean, cov), eps ~ N(0, I).
         a, b = 1 - time, time + estimator.noise_scale
         return a, b, a**2 * cov + b**2 * eye
 
-    def exact_velocity(input, condition, time):
+    def exact_velocity(input, *args):
         # E[eps - theta_0 | theta_t], the target of the flow matching loss.
+        time = args[0] if masked else args[1]
         a, b, marginal_cov = marginal(time)
         residual = torch.linalg.solve(marginal_cov, (input - a * mean).T).T
         return residual @ (b * eye - a * cov) - mean
@@ -875,6 +887,7 @@ def test_flow_matching_score_is_the_marginal_score():
     estimator.forward = exact_velocity
     inputs = torch.randn(5, 2, dtype=dtype)
     condition = torch.zeros(5, 1, dtype=dtype)
+    condition_mask = torch.zeros(5, 2, dtype=torch.bool)
     # Above effective_t_max (0.99), all SDE functions use the marginal at 0.99.
     for t in [0.05, 0.5, 0.95, 0.995, 1.0]:
         time = torch.tensor([t], dtype=dtype)
@@ -882,7 +895,11 @@ def test_flow_matching_score_is_the_marginal_score():
         s = estimator.std_fn(time).reshape(())
         marginal_cov = m**2 * cov + s**2 * eye
         expected = -torch.linalg.solve(marginal_cov, (inputs - m * mean).T).T
-        torch.testing.assert_close(estimator.score(inputs, condition, time), expected)
+        if masked:
+            score = estimator.score(inputs, time, condition_mask, None)
+        else:
+            score = estimator.score(inputs, condition, time)
+        torch.testing.assert_close(score, expected)
 
 
 @pytest.mark.parametrize("iid_method", ["fnpe", "gauss", "auto_gauss", "jac_gauss"])
