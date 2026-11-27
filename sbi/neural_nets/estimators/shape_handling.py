@@ -31,8 +31,15 @@ def reshape_to_sample_batch_event(
     # `2` for image data, `3` for video data, ...
     event_shape_dim = len(event_shape)
 
-    trailing_theta_or_x_shape = theta_or_x.shape[-event_shape_dim:]
-    leading_theta_or_x_shape = theta_or_x.shape[:-event_shape_dim]
+    # Guard against the Python edge case where `shape[-0:]` returns the full shape
+    # instead of an empty slice, which causes a false mismatch for scalar events
+    # (event_shape == torch.Size([])).
+    if event_shape_dim == 0:
+        trailing_theta_or_x_shape = torch.Size([])
+        leading_theta_or_x_shape = theta_or_x.shape
+    else:
+        trailing_theta_or_x_shape = theta_or_x.shape[-event_shape_dim:]
+        leading_theta_or_x_shape = theta_or_x.shape[:-event_shape_dim]
     if trailing_theta_or_x_shape != event_shape:
         raise RuntimeError(
             f"The shape of the input does not match the expected shape. "
@@ -84,8 +91,15 @@ def reshape_to_batch_event(theta_or_x: Tensor, event_shape: torch.Size) -> Tenso
     # `2` for image data, `3` for video data, ...
     event_shape_dim = len(event_shape)
 
-    trailing_theta_or_x_shape = theta_or_x.shape[-event_shape_dim:]
-    leading_theta_or_x_shape = theta_or_x.shape[:-event_shape_dim]
+    # Guard against the Python edge case where `shape[-0:]` returns the full shape
+    # instead of an empty slice, which causes a false mismatch for scalar events
+    # (event_shape == torch.Size([])).
+    if event_shape_dim == 0:
+        trailing_theta_or_x_shape = torch.Size([])
+        leading_theta_or_x_shape = theta_or_x.shape
+    else:
+        trailing_theta_or_x_shape = theta_or_x.shape[-event_shape_dim:]
+        leading_theta_or_x_shape = theta_or_x.shape[:-event_shape_dim]
     if trailing_theta_or_x_shape != event_shape:
         raise RuntimeError(
             f"The shape of the input does not match the expected shape. "

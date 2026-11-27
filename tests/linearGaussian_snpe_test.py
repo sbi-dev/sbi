@@ -1191,3 +1191,17 @@ def test_npe_a_gaussian_proposal_equal_to_prior_keeps_the_density():
         assert torch.allclose(
             estimator.log_prob(theta, x), estimator.net.log_prob(theta, x), atol=1e-3
         )
+
+
+def test_npe_b_log_prob_proposal_posterior_raises_on_unbatched_theta():
+    """Test that NPE_B._log_prob_proposal_posterior raises ValueError on unbatched
+    theta.
+    """
+    prior = MultivariateNormal(zeros(2), eye(2))
+    inference = NPE_B(prior=prior, show_progress_bars=False)
+    theta = prior.sample((10,))
+    inference.append_simulations(theta, theta).train(max_num_epochs=1)
+    with pytest.raises(ValueError, match="`theta` must have a batch dimension"):
+        inference._log_prob_proposal_posterior(
+            zeros(2), zeros(1, 2), torch.ones(2, dtype=torch.bool), None
+        )
