@@ -498,9 +498,9 @@ def count_accepted(
 
     For every observation, draws until `target_accepted` draws are accepted or
     `max_num_draws` draws are made. The draws are counted, not kept. Observations go
-    in chunks that fit `target_accepted` draws each into one call of `proposal`, and one
-    call gets at most `max_sampling_batch_size` draws, so memory does not grow with
-    the number of draws or observations.
+    in chunks that fit 20% more than `target_accepted` draws each into one call of
+    `proposal`, and one call gets at most `max_sampling_batch_size` draws, so memory
+    does not grow with the number of draws or observations.
 
     Args:
         proposal: Called as `proposal(num_draws, indices)` with an index tensor of
@@ -532,7 +532,7 @@ def count_accepted(
         total=num_xos,
         desc=f"Counting accepted draws for {num_xos} observation(s)",
     )
-    chunk_size = max(1, max_sampling_batch_size // target_accepted)
+    chunk_size = max(1, max_sampling_batch_size // math.ceil(1.2 * target_accepted))
     for pending in torch.arange(num_xos, device="cpu").split(chunk_size):
         # Pending observations get the same draws in every step, so one count holds.
         num_drawn = 0
