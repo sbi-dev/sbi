@@ -5,7 +5,6 @@ import warnings
 from typing import Any, ClassVar, Dict, Literal, Optional, Tuple, Union
 
 from torch.distributions import Distribution
-from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.posterior_parameters import (
@@ -82,7 +81,8 @@ class MNPE(NPE_C):
         ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[SummaryWriter] = None,
+        *,
+        summary_writer: None = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
@@ -103,8 +103,8 @@ class MNPE(NPE_C):
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: Deprecated alias for the TensorBoard summary writer.
-                Use ``tracker`` instead.
+            summary_writer: Removed in sbi v0.28.0; passing it raises a `TypeError`.
+                Use `tracker=TensorBoardTracker(summary_writer)` instead.
             tracker: Tracking adapter used to log training metrics. If None, a
                 TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show a progressbar during simulation and

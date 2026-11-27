@@ -17,7 +17,6 @@ from typing import (
 
 from torch import Tensor
 from torch.distributions import Distribution
-from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.posterior_parameters import (
@@ -65,7 +64,8 @@ class LikelihoodEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], A
         ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[SummaryWriter] = None,
+        *,
+        summary_writer: None = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):

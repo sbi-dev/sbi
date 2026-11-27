@@ -6,7 +6,6 @@ from typing import Dict, Optional, Sequence, Union
 import torch
 from torch import Tensor, nn, ones
 from torch.distributions import Distribution
-from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.trainers._contracts import LossArgs, LossArgsBNRE
 from sbi.inference.trainers.nre.nre_a import NRE_A
@@ -74,7 +73,8 @@ class BNRE(NRE_A):
         ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
-        summary_writer: Optional[SummaryWriter] = None,
+        *,
+        summary_writer: None = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
@@ -94,8 +94,8 @@ class BNRE(NRE_A):
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: Deprecated alias for the TensorBoard summary writer.
-                Use ``tracker`` instead.
+            summary_writer: Removed in sbi v0.28.0; passing it raises a `TypeError`.
+                Use `tracker=TensorBoardTracker(summary_writer)` instead.
             tracker: Tracking adapter used to log training metrics. If None, a
                 TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show a progressbar during simulation and

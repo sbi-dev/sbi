@@ -18,7 +18,6 @@ from typing import (
 
 from torch import Tensor, ones
 from torch.distributions import Distribution, MultivariateNormal, Uniform
-from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors import DirectPosterior
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
@@ -94,7 +93,8 @@ class PosteriorEstimatorTrainer(NeuralInference[ConditionalDensityEstimator], AB
         ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[SummaryWriter] = None,
+        *,
+        summary_writer: None = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):

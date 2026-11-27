@@ -5,7 +5,6 @@ from typing import ClassVar, Literal, Optional, Union
 
 from torch import Tensor
 from torch.distributions import Distribution
-from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.trainers.vfpe.base_vf_inference import MaskedVectorFieldTrainer
 from sbi.neural_nets.estimators.base import (
@@ -79,7 +78,8 @@ class Simformer(MaskedVectorFieldTrainer):
         sde_type: Optional[Literal["vp", "ve", "subvp"]] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[SummaryWriter] = None,
+        *,
+        summary_writer: None = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
@@ -107,8 +107,8 @@ class Simformer(MaskedVectorFieldTrainer):
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
                 string.
-            summary_writer: Deprecated alias for the TensorBoard summary writer.
-                Use ``tracker`` instead.
+            summary_writer: Removed in sbi v0.28.0; passing it raises a `TypeError`.
+                Use `tracker=TensorBoardTracker(summary_writer)` instead.
             tracker: Tracking adapter used to log training metrics. If None, a
                 TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show progress bars during training.
@@ -169,7 +169,8 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
         ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[SummaryWriter] = None,
+        *,
+        summary_writer: None = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
@@ -193,8 +194,8 @@ class FlowMatchingSimformer(MaskedVectorFieldTrainer):
             device: Device to run the training on.
             logging_level: Logging level for the training. Can be an integer or a
                 string.
-            summary_writer: Deprecated alias for the TensorBoard summary writer.
-                Use ``tracker`` instead.
+            summary_writer: Removed in sbi v0.28.0; passing it raises a `TypeError`.
+                Use `tracker=TensorBoardTracker(summary_writer)` instead.
             tracker: Tracking adapter used to log training metrics. If None, a
                 TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show progress bars during training.

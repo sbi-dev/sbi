@@ -6,7 +6,6 @@ import warnings
 from typing import Any, ClassVar, Dict, Literal, Optional, Union
 
 from torch.distributions import Distribution
-from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
@@ -92,7 +91,7 @@ class FMPE(VectorFieldTrainer):
         ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[SummaryWriter] = None,
+        summary_writer: None = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ) -> None:
@@ -112,8 +111,8 @@ class FMPE(VectorFieldTrainer):
             density_estimator: Deprecated. Use `vf_estimator` instead.
             device: Device to use for training.
             logging_level: Logging level.
-            summary_writer: Deprecated alias for the TensorBoard summary writer.
-                Use ``tracker`` instead.
+            summary_writer: Removed in sbi v0.28.0; passing it raises a `TypeError`.
+                Use `tracker=TensorBoardTracker(summary_writer)` instead.
             tracker: Tracking adapter used to log training metrics. If None, a
                 TensorBoard tracker is used with a default log directory.
             show_progress_bars: Whether to show progress bars.

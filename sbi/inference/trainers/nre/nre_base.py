@@ -9,7 +9,6 @@ from typing import Any, ClassVar, Dict, Literal, Optional, Self, Sequence, Tuple
 import torch
 from torch import Tensor, eye, ones
 from torch.distributions import Distribution
-from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.posterior_parameters import (
@@ -60,7 +59,8 @@ class RatioEstimatorTrainer(NeuralInference[RatioEstimator], ABC):
         ] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
-        summary_writer: Optional[SummaryWriter] = None,
+        *,
+        summary_writer: None = None,
         tracker: Optional[Tracker] = None,
         show_progress_bars: bool = True,
     ):
