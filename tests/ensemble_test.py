@@ -122,11 +122,8 @@ def test_c2st_posterior_ensemble_on_linearGaussian(
             f"D-KL={dkl} is more than 2 stds above the average performance."
         )
 
-    # test individual log_prob, which only the normalized NPE posteriors have
-    if isinstance(inferer, NPE_C):
-        posterior.log_prob(samples, individually=True)
-    else:
-        posterior.potential(samples)
+    # test individual log_prob and map
+    posterior.log_prob(samples, individually=True)
 
     # Test sample_batched
     x_o_batch_dim = 2

@@ -4,7 +4,7 @@ import inspect
 import warnings
 from functools import partial
 from math import ceil
-from typing import Any, Callable, Dict, Literal, NoReturn, Optional, Self, Union
+from typing import Any, Callable, Dict, Literal, Optional, Self, Union
 from warnings import warn
 
 import torch
@@ -192,18 +192,35 @@ class MCMCPosterior(NeuralPosterior):
         self.method = method
         return self
 
-    def log_prob(self, *args: Any, **kwargs: Any) -> NoReturn:
-        """Not available, because this posterior is unnormalized.
+    def log_prob(
+        self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
+    ) -> Tensor:
+        r"""Returns the log-probability of theta under the posterior.
 
-        Raises:
-            NotImplementedError: Always. `.potential()` returns the unnormalized
-                log-probability that `log_prob()` returned before sbi v0.28.0.
+        Args:
+            theta: Parameters $\theta$.
+            x: Observation. If not provided, uses the default `x`. Several
+                observations are combined as iid trials.
+            track_gradients: Whether the returned tensor supports tracking gradients.
+                This can be helpful for e.g. sensitivity analysis, but increases memory
+                consumption.
+
+        Returns:
+            `len($\theta$)`-shaped log-probability.
         """
-        raise NotImplementedError(
-            f"`{type(self).__name__}.log_prob()` was removed in sbi v0.28.0, because "
-            "this posterior can only evaluate the log-probability up to a "
-            "normalizing constant. Use `.potential(theta, x)`, which returns the same "
-            "values."
+        warn(
+            "`.log_prob()` is deprecated for methods that can only evaluate the "
+            "log-probability up to a normalizing constant. Use `.potential()` instead.",
+            stacklevel=2,
+        )
+        warn("The log-probability is unnormalized!", stacklevel=2)
+
+        x = self._x_else_default_x(x)
+        self.potential_fn = self._bind_iid(x)
+
+        theta = self._theta_batched(theta)
+        return self.potential_fn(
+            theta.to(self._device), track_gradients=track_gradients
         )
 
     def sample(
