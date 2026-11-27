@@ -15,7 +15,7 @@ from sbi.utils.torchutils import BoxUniform
 @pytest.mark.parametrize("num_sims", (0, 10))
 @pytest.mark.parametrize("batch_size", (1, 10))
 @pytest.mark.parametrize(
-    "simulator", (diagonal_linear_gaussian, lambda _: torch.randn((2,)))
+    "simulator", (diagonal_linear_gaussian, lambda theta: torch.randn(len(theta), 2))
 )
 @pytest.mark.parametrize("seed", (None, 42))
 def test_simulate_in_batches(
@@ -36,3 +36,33 @@ def test_simulate_in_batches(
         assert not torch.equal(x1, x2)
     else:
         assert torch.equal(x1, x2)
+
+
+def test_seeded_simulate_in_batches_does_not_depend_on_num_workers():
+    """Every call gets its own seed, so workers do not change or repeat the noise."""
+    theta = zeros(30, 2)
+    x, x_with_workers = [
+        simulate_in_batches(
+            lambda theta: theta + torch.randn_like(theta),
+            theta,
+            num_workers=num_workers,
+            seed=0,
+            show_progress_bars=False,
+        )
+        for num_workers in [1, 2]
+    ]
+
+    assert len(torch.unique(x, dim=0)) == 30
+    assert torch.equal(x, x_with_workers)
+
+
+@pytest.mark.parametrize("batch_size", (1, None))
+def test_simulate_in_batches_with_scalar_parameters(batch_size):
+    """Parameters of shape (num_simulations,), e.g. from MCABC with a scalar prior."""
+    theta = torch.rand(10)
+
+    x = simulate_in_batches(
+        lambda theta: theta[:, None] + 1, theta, batch_size, show_progress_bars=False
+    )
+
+    assert torch.equal(x, theta[:, None] + 1)
