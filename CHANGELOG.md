@@ -15,6 +15,8 @@
 * **`plot_summary` no longer takes `inference` or `disable_tensorboard_prompt`** ([#XXXX](https://github.com/sbi-dev/sbi/pull/XXXX)): both were deprecated in v0.27.0 ([#1861](https://github.com/sbi-dev/sbi/pull/1861)). Use `trainer`, and `verbose=False` in place of `disable_tensorboard_prompt=True`. `trainer` is now a required argument.
 * **`LC2ST` and `LC2ST_NF` no longer take `thetas`, and their `get_scores()` and `get_statistics_under_null_hypothesis()` no longer take `return_probs`** ([#XXXX](https://github.com/sbi-dev/sbi/pull/XXXX)): both were deprecated in v0.27.0 ([#1727](https://github.com/sbi-dev/sbi/pull/1727)). Use `prior_samples`, and the `scores` and `probabilities` of the returned `LC2STScores`.
   * `verbosity` of `get_statistics_under_null_hypothesis()` can only be passed by keyword now.
+* **Posteriors no longer take `x_shape`** ([#XXXX](https://github.com/sbi-dev/sbi/pull/XXXX)): it had no effect and warned since v0.23.0. Remove it from the call.
+  * In `DirectPosterior`, `FilteredDirectPosterior`, `MCMCPosterior` and `VIPosterior`, the arguments that followed it (`enable_transform`, `filter_type`, `filter_size`, `target_accept`, `parameters` and the later `VIPosterior` arguments) can only be passed by keyword now.
 
 ## v0.27.0
 

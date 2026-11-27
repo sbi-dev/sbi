@@ -31,7 +31,6 @@ class RejectionPosterior(NeuralPosterior):
         num_iter_to_find_max: int = 100,
         m: float = 1.2,
         device: Optional[Union[str, torch.device]] = None,
-        x_shape: Optional[torch.Size] = None,
     ):
         """
         Args:
@@ -49,13 +48,11 @@ class RejectionPosterior(NeuralPosterior):
             m: Multiplier to the `potential_fn / proposal` ratio.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
-            x_shape: Deprecated, should not be passed.
         """
         super().__init__(
             potential_fn,
             theta_transform=theta_transform,
             device=device,
-            x_shape=x_shape,
         )
 
         self.proposal = proposal
@@ -63,7 +60,6 @@ class RejectionPosterior(NeuralPosterior):
         self.num_samples_to_find_max = num_samples_to_find_max
         self.num_iter_to_find_max = num_iter_to_find_max
         self.m = m
-        self.x_shape = x_shape
 
         self._purpose = (
             "It provides rejection sampling to .sample() from the posterior and "

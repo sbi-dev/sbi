@@ -78,7 +78,6 @@ def get_inference():
                 "potential_fn",
                 "prior",
                 "device",
-                "x_shape",  # deprecated
                 "parameters",  # for custom q, use set_q() instead
                 "modules",  # for custom q, use set_q() instead
                 "theta_transform",

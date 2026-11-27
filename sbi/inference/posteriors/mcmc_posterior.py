@@ -63,7 +63,7 @@ class MCMCPosterior(NeuralPosterior):
         num_workers: int = 1,
         mp_context: Literal["fork", "spawn"] = "spawn",
         device: Optional[Union[str, torch.device]] = None,
-        x_shape: Optional[torch.Size] = None,
+        *,
         target_accept: Optional[float] = None,
     ):
         """
@@ -104,7 +104,6 @@ class MCMCPosterior(NeuralPosterior):
                 (e.g. Linux and macOS, not Windows).
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
-            x_shape: Deprecated, should not be passed.
             target_accept: Target acceptance probability used only by the PyMC
                 samplers `hmc_pymc` and `nuts_pymc`; it is ignored by `slice_pymc`,
                 the Pyro samplers (`hmc_pyro`, `nuts_pyro`) and the numpy slice
@@ -117,7 +116,6 @@ class MCMCPosterior(NeuralPosterior):
             potential_fn,
             theta_transform=theta_transform,
             device=device,
-            x_shape=x_shape,
         )
 
         self.proposal = proposal
@@ -136,7 +134,6 @@ class MCMCPosterior(NeuralPosterior):
 
         # Hardcode parameter name to reduce clutter kwargs.
         self.param_name = "theta"
-        self.x_shape = x_shape
 
         self.potential_ = self._prepare_potential(method)
 
