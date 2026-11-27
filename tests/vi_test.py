@@ -1064,7 +1064,7 @@ def test_iw_loss_leaves_out_groups_entirely_outside_the_support(monkeypatch):
 
 def test_rollback_keeps_the_optimizer_settings(monkeypatch):
     """Recovery resets the optimizer's state, not its settings, including those a
-    scheduler has changed."""
+    scheduler has changed, nor hooks registered on it."""
     prior = MultivariateNormal(zeros(1), eye(1))
     optimizer = ForwardKLOptimizer(
         potential_fn=FakePotential(prior=prior),
@@ -1077,6 +1077,8 @@ def test_rollback_keeps_the_optimizer_settings(monkeypatch):
         gamma=0.999,
     )
     monkeypatch.setattr(optimizer, "warm_up", lambda num_steps: None)
+    hook_calls = []
+    optimizer._optimizer.register_step_post_hook(lambda *args: hook_calls.append(1))
     for p in optimizer.q.parameters():
         p.grad = torch.ones_like(p)
     optimizer._optimizer.step()  # fills the momentum buffers
@@ -1087,6 +1089,8 @@ def test_rollback_keeps_the_optimizer_settings(monkeypatch):
     kept = [settings[key] for key in ("lr", "momentum", "weight_decay")]
     assert kept == [1e-4, 0.5, 0.1]
     assert not optimizer._optimizer.state
+    optimizer._optimizer.step()
+    assert len(hook_calls) == 2
 
 
 def test_alpha_loss_at_alpha_one_is_the_elbo(monkeypatch):

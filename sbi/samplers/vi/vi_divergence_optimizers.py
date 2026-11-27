@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import warnings
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from typing import Callable, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
@@ -150,6 +151,8 @@ class DivergenceOptimizer(ABC):
         scheduler_kwargs = filter_kwargs_for_func(scheduler.__init__, kwargs)
 
         self._optimizer = optimizer(self.q.parameters(), **opt_kwargs)
+        # Its state before any step, to restore on a rollback.
+        self._fresh_optimizer_state = deepcopy(self._optimizer.state_dict()["state"])
         self._scheduler = scheduler(self._optimizer, **scheduler_kwargs)
         # Loss and summary
         self.eps = eps
@@ -238,18 +241,12 @@ class DivergenceOptimizer(ABC):
         """
         for state_para, para in zip(self.state_dict, self.q.parameters(), strict=False):
             para.data = state_para.data.clone().to(para.device)
-        # A fresh state from the constructor (Adagrad up to torch 2.9 builds it only
-        # there), then the settings in `param_groups`, including a scheduler's.
-        settings = [
-            {key: value for key, value in group.items() if key != "params"}
-            for group in self._optimizer.param_groups
-        ]
-        defaults = filter_kwargs_for_func(
-            type(self._optimizer).__init__, self._optimizer.defaults
-        )
-        self._optimizer.__init__(self.q.parameters(), **defaults)
-        for group, kept in zip(self._optimizer.param_groups, settings, strict=True):
-            group.update(kept)
+        # The state from before any step (Adagrad builds one in its constructor), with
+        # the current settings, including a scheduler's. A copy, as the optimizer
+        # updates its state in place.
+        optimizer_state = self._optimizer.state_dict()
+        optimizer_state["state"] = deepcopy(self._fresh_optimizer_state)
+        self._optimizer.load_state_dict(optimizer_state)
         if self.prior is not None:
             self.warm_up(warm_up_rounds)
 
@@ -412,6 +409,7 @@ class DivergenceOptimizer(ABC):
         scheduler_kwargs = filter_kwargs_for_func(sched_type.__init__, kwargs)
 
         self._optimizer = opt_type(self.q.parameters(), **opt_kwargs)
+        self._fresh_optimizer_state = deepcopy(self._optimizer.state_dict()["state"])
         self._scheduler = sched_type(self._optimizer, **scheduler_kwargs)
 
 
