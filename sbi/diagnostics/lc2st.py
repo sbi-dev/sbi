@@ -940,14 +940,16 @@ class LC2ST_NF(LC2ST):
         self,
         x_o: Tensor,
         trained_clfs: List[BaseEstimator],
-        **kwargs: Any,
+        *,
+        theta_o: Optional[Tensor] = None,
     ) -> LC2STScores:
         """Computes the L-C2ST scores given the trained classifiers.
 
         Args:
             x_o: The observation, of shape (,dim_x).
             trained_clfs: Trained classifiers.
-            kwargs: Additional arguments used in the parent class.
+            theta_o: Ignored. `LC2ST_NF` evaluates on its own samples from the
+                base distribution; the `LC2ST` methods it calls pass `theta_o`.
 
         Returns:
             LC2STScores object containing the scores and the predicted probabilities.
@@ -961,14 +963,16 @@ class LC2ST_NF(LC2ST):
     def get_statistic_on_observed_data(
         self,
         x_o: Tensor,
-        **kwargs: Any,
+        *,
+        theta_o: Optional[Tensor] = None,
     ) -> float:
         """Computes the L-C2ST statistics for the observed data:
         Mean over all cv-scores.
 
         Args:
             x_o: The observation, of shape (, dim_x).
-            kwargs: Additional arguments used in the parent class.
+            theta_o: Ignored. `LC2ST_NF` evaluates on its own samples from the
+                base distribution; the `LC2ST` methods it calls pass `theta_o`.
 
         Returns:
             L-C2ST statistic at `x_o`.
@@ -978,7 +982,8 @@ class LC2ST_NF(LC2ST):
     def p_value(
         self,
         x_o: Tensor,
-        **kwargs: Any,
+        *,
+        theta_o: Optional[Tensor] = None,
     ) -> float:
         r"""Computes the p-value for L-C2ST.
 
@@ -989,7 +994,8 @@ class LC2ST_NF(LC2ST):
 
         Args:
             x_o: The observation, of shape (, dim_x).
-            kwargs: Additional arguments used in the parent class.
+            theta_o: Ignored. `LC2ST_NF` evaluates on its own samples from the
+                base distribution; the `LC2ST` methods it calls pass `theta_o`.
 
         Returns:
             p-value for L-C2ST at `x_o`.
@@ -1000,14 +1006,16 @@ class LC2ST_NF(LC2ST):
         self,
         x_o: Tensor,
         alpha: float = 0.05,
-        **kwargs: Any,
+        *,
+        theta_o: Optional[Tensor] = None,
     ) -> bool:
         """Computes the test result for L-C2ST at a given significance level.
 
         Args:
             x_o: The observation, of shape (, dim_x).
             alpha: Significance level, defaults to 0.05.
-            kwargs: Additional arguments used in the parent class.
+            theta_o: Ignored. `LC2ST_NF` evaluates on its own samples from the
+                base distribution; the `LC2ST` methods it calls pass `theta_o`.
 
         Returns:
             L-C2ST result: True if rejected, False otherwise.
@@ -1043,7 +1051,7 @@ class LC2ST_NF(LC2ST):
         x_o: Tensor,
         *,
         verbosity: int = 0,
-        **kwargs: Any,
+        theta_o: Optional[Tensor] = None,
     ) -> LC2STScores:
         """Computes the L-C2ST scores under the null hypothesis.
 
@@ -1051,7 +1059,8 @@ class LC2ST_NF(LC2ST):
             x_o: The observation.
                 Shape (, dim_x)
             verbosity: Verbosity level, defaults to 0.
-            kwargs: Additional arguments used in the parent class.
+            theta_o: Ignored. `LC2ST_NF` evaluates on its own samples from the
+                base distribution; the `LC2ST` methods it calls pass `theta_o`.
         """
         return super().get_statistics_under_null_hypothesis(
             theta_o=self.theta_o,
