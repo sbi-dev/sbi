@@ -668,8 +668,9 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
             posterior_parameters = FilteredDirectPosteriorParameters(**params)
         elif sample_with == "mcmc":
             params = kwargs.get("mcmc_parameters", {}) or {}
+            method = kwargs.get("mcmc_method")
             posterior_parameters = MCMCPosteriorParameters(
-                method=kwargs.get("mcmc_method") or "slice_np_vectorized", **params
+                **params, **({} if method is None else {"method": method})
             )
         elif sample_with in ("ode", "sde"):
             params = kwargs.get("vectorfield_sampling_parameters", {}) or {}
@@ -679,8 +680,9 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
             posterior_parameters = RejectionPosteriorParameters(**params)
         elif sample_with == "vi":
             params = kwargs.get("vi_parameters", {}) or {}
+            vi_method = kwargs.get("vi_method")
             posterior_parameters = VIPosteriorParameters(
-                vi_method=kwargs.get("vi_method") or "rKL", **params
+                **params, **({} if vi_method is None else {"vi_method": vi_method})
             )
         elif sample_with == "importance":
             params = kwargs.get("importance_sampling_parameters", {}) or {}
@@ -797,7 +799,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
                 warnings.warn(
                     f"Conflicting mcmc_method='{mcmc_method}' ignored in favor of "
                     f"posterior_parameters.method='{posterior_parameters.method}'",
-                    stacklevel=2,
+                    stacklevel=_stacklevel_to_caller(),
                 )
         elif isinstance(posterior_parameters, VIPosteriorParameters):
             vi_method = kwargs.get("vi_method")
@@ -805,7 +807,7 @@ class BaseNeuralInference(ABC, Generic[BaseConditionalEstimatorType]):
                 warnings.warn(
                     f"Conflicting vi_method='{vi_method}' ignored in favor of "
                     f"posterior_parameters.vi_method='{posterior_parameters.vi_method}'",
-                    stacklevel=2,
+                    stacklevel=_stacklevel_to_caller(),
                 )
 
     def _create_posterior(
