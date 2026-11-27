@@ -16,6 +16,7 @@ from sbi.inference import (
     MCMCPosterior,
     RejectionPosterior,
     VIPosterior,
+    VectorFieldPosterior,
     likelihood_estimator_based_potential,
     ratio_estimator_based_potential,
 )
@@ -260,6 +261,156 @@ def test_bind_preserves_estimator(potential_type: str):
 
     assert bound is not potential
     assert bound.x_o is not None
+
+
+def test_vector_field_bind_preserves_iid_params():
+    """bind() without iid_params keeps the constructor-configured dict.
+
+    `VectorFieldPosterior.sample()` rebinds the potential with `iid_params=None`,
+    so dropping the configured dict there silently changes the iid score.
+    """
+    prior = BoxUniform(zeros(2), ones(2))
+    theta = prior.sample((20,))
+    iid_params = {"prior_score_weight": lambda t: torch.ones_like(t)}
+    potential = VectorFieldBasedPotential(
+        posterior_score_nn()(theta, torch.randn(20, 2)),
+        prior,
+        iid_method="fnpe",
+        iid_params=iid_params,
+    )
+    x_o = torch.randn(2, 2)
+
+    bound = potential.bind(x_o, x_is_iid=True)
+    assert bound.iid_method == "fnpe"
+    assert bound.iid_params is iid_params
+
+    assert bound.bind(x_o, x_is_iid=True).iid_params is iid_params
+
+    override = {"prior_score_weight": lambda t: torch.zeros_like(t)}
+    explicitly_bound = potential.bind(x_o, x_is_iid=True, iid_params=override)
+    assert explicitly_bound.iid_params is override
+
+
+def test_vector_field_bind_drops_iid_params_when_method_switches():
+    """Params for one iid method must not be passed to another method.
+
+    `precision_est_budget` configures `auto_gauss` but is not accepted by `fnpe`.
+    """
+    prior = BoxUniform(zeros(2), ones(2))
+    theta = prior.sample((20,))
+    iid_params = {"precision_est_budget": 500}
+    potential = VectorFieldBasedPotential(
+        posterior_score_nn()(theta, torch.randn(20, 2)),
+        prior,
+        iid_method="auto_gauss",
+        iid_params=iid_params,
+    )
+    x_o = torch.randn(2, 2)
+
+    switched = potential.bind(x_o, x_is_iid=True, iid_method="fnpe")
+    assert switched.iid_method == "fnpe"
+    assert switched.iid_params is None
+    # The old fallback raised a TypeError here: precision_est_budget is not an fnpe
+    # argument.
+    theta = torch.randn(1, 2, 2)
+    assert switched.gradient(theta, time=torch.tensor([0.1])).shape == theta.shape
+
+    same_method = potential.bind(x_o, x_is_iid=True, iid_method="auto_gauss")
+    assert same_method.iid_params is iid_params
+
+
+@pytest.mark.parametrize(
+    "configured_iid_params",
+    [None, {"prior_score_weight": lambda t: torch.ones_like(t)}],
+    ids=["none", "dict"],
+)
+def test_vector_field_sample_iid_param_override_does_not_persist(
+    monkeypatch, configured_iid_params
+):
+    """A one-off `sample(iid_params=...)` must not become the new default."""
+    prior = BoxUniform(zeros(2), ones(2))
+    theta = prior.sample((20,))
+    posterior = VectorFieldPosterior(
+        prior=prior,
+        vector_field_estimator=posterior_score_nn()(theta, torch.randn(20, 2)),
+        sample_with="sde",
+        iid_method="fnpe",
+        iid_params=configured_iid_params,
+    )
+    posterior.set_default_x(torch.randn(2, 2))
+    monkeypatch.setattr(
+        posterior,
+        "_sample_via_diffusion",
+        lambda sample_shape, **kwargs: torch.zeros(torch.Size(sample_shape) + (2,)),
+    )
+
+    override = {"prior_score_weight": lambda t: torch.zeros_like(t)}
+    expected_default = (
+        configured_iid_params if configured_iid_params is not None else {}
+    )
+
+    posterior.sample(
+        (1,), iid_params=override, show_progress_bars=False, reject_outside_prior=False
+    )
+    assert posterior.potential_fn.iid_params is override
+
+    posterior.sample((1,), show_progress_bars=False, reject_outside_prior=False)
+    assert posterior.potential_fn.iid_method == "fnpe"
+    assert posterior.potential_fn.iid_params == expected_default
+
+    posterior.sample(
+        (1,), iid_method="fnpe", show_progress_bars=False, reject_outside_prior=False
+    )
+    assert posterior.potential_fn.iid_params == expected_default
+
+    posterior.sample(
+        (1,),
+        iid_method="gauss",
+        iid_params=override,
+        show_progress_bars=False,
+        reject_outside_prior=False,
+    )
+    assert posterior.potential_fn.iid_params is override
+    posterior.sample(
+        (1,), iid_method="gauss", show_progress_bars=False, reject_outside_prior=False
+    )
+    assert posterior.potential_fn.iid_params == {}
+
+
+def test_vector_field_posterior_unpickle_without_initial_iid_fields(monkeypatch):
+    """Old pickles restore the iid defaults from their saved potential."""
+    prior = BoxUniform(zeros(2), ones(2))
+    theta = prior.sample((20,))
+    iid_params = {"prior_score_weight": lambda t: torch.ones_like(t)}
+    posterior = VectorFieldPosterior(
+        prior=prior,
+        vector_field_estimator=posterior_score_nn()(theta, torch.randn(20, 2)),
+        sample_with="sde",
+        iid_method="fnpe",
+        iid_params=iid_params,
+    )
+    posterior.set_default_x(torch.randn(2, 2))
+    state = dict(posterior.__getstate__())
+    state.pop("_initial_iid_method")
+    state.pop("_initial_iid_params")
+
+    restored = VectorFieldPosterior.__new__(VectorFieldPosterior)
+    restored.__setstate__(state)
+    monkeypatch.setattr(
+        restored,
+        "_sample_via_diffusion",
+        lambda sample_shape, **kwargs: torch.zeros(torch.Size(sample_shape) + (2,)),
+    )
+
+    override = {"prior_score_weight": lambda t: torch.zeros_like(t)}
+    restored.sample(
+        (1,), iid_params=override, show_progress_bars=False, reject_outside_prior=False
+    )
+    assert restored.potential_fn.iid_params is override
+
+    restored.sample((1,), show_progress_bars=False, reject_outside_prior=False)
+    assert restored.potential_fn.iid_method == "fnpe"
+    assert restored.potential_fn.iid_params is iid_params
 
 
 def test_vector_field_potential_marginalizes_1d_prior_exactly():
