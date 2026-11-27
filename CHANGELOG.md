@@ -11,6 +11,7 @@
   * `tracker` and `show_progress_bars` can only be passed by keyword now, so a call that passed them by position fails instead of filling the wrong argument.
 * **`FMPE` and `NPSE` no longer take `density_estimator`, and `NPSE` no longer takes `score_estimator`** ([#XXXX](https://github.com/sbi-dev/sbi/pull/XXXX)): they were deprecated in v0.25.0 ([#1544](https://github.com/sbi-dev/sbi/pull/1544)) and, for `NPSE(density_estimator=...)`, v0.26.0 ([#1777](https://github.com/sbi-dev/sbi/pull/1777)). Pass the estimator as `vf_estimator`. Passing the old names raises a `TypeError` that says so.
   * All arguments after `vf_estimator`, including `device` and `NPSE`'s `sde_type`, can only be passed by keyword now.
+* **`FlowMatchingEstimator` no longer takes `num_freqs` or other unknown keyword arguments** ([#XXXX](https://github.com/sbi-dev/sbi/pull/XXXX)): `num_freqs` was deprecated in v0.25.0 ([#1544](https://github.com/sbi-dev/sbi/pull/1544)) and had no effect. An unknown keyword argument, including an `extra_kwargs` entry of `FlowMatchingConfig` that the estimator does not take, now raises a `TypeError` instead of being dropped silently.
 
 ## v0.27.0
 

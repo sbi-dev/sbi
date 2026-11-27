@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-import warnings
 from typing import Optional, Tuple, Union
 
 import torch
@@ -71,7 +70,6 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
         gaussian_baseline: bool = False,
         compose_shift: Optional[Tensor] = None,
         compose_scale: Optional[Tensor] = None,
-        **kwargs,
     ) -> None:
         r"""Creates a vector field estimator for Flow Matching.
 
@@ -94,15 +92,6 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             compose_scale: Scale of the boundary affine, given together with
                 `compose_shift`.
         """
-
-        if "num_freqs" in kwargs:
-            del kwargs["num_freqs"]
-            warnings.warn(
-                "num_freqs is deprecated and will be removed in the future. "
-                "Please use the positional_encoding_net instead.",
-                FutureWarning,
-                stacklevel=2,
-            )
 
         super().__init__(
             net=net,
