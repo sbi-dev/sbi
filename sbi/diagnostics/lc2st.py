@@ -173,6 +173,11 @@ class LC2ST:
             raise ValueError("xs is required.")
         if posterior_samples is None:
             raise ValueError("posterior_samples is required.")
+        if num_trials_null < 1:
+            raise ValueError(
+                f"num_trials_null must be at least 1, got {num_trials_null}. Without "
+                "null trials, the p-value is always 1."
+            )
 
         # Validate inputs before cleaning to avoid indexing errors
         self._validate_inputs(prior_samples, xs, posterior_samples, num_folds, seed)
