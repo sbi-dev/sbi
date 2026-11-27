@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+from functools import partial
 from typing import Callable, Union
 
 import torch
@@ -59,8 +60,8 @@ class MixedData(Task):
         )
 
     def get_simulator(self) -> Callable:
-        """Return the mixed data simulator."""
-        return mixed_simulator
+        """Return the mixed data simulator at the task's stimulus condition."""
+        return partial(mixed_simulator, stimulus_condition=self.stimulus_condition)
 
     def get_true_parameters(self, idx: int) -> Tensor:
         """Generate reproducible true parameters for an observation."""

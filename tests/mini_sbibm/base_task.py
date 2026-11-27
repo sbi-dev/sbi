@@ -104,7 +104,8 @@ class Task(ABC):
             torch.Tensor: The loaded true parameters.
         """
         theta = torch.load(
-            PATH + os.sep + "files" + os.sep + f"{self.name}{os.sep}theta_{idx}.pt"
+            PATH + os.sep + "files" + os.sep + f"{self.name}{os.sep}theta_o_{idx}.pt",
+            weights_only=False,
         )
         return theta
 
