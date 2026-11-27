@@ -40,6 +40,17 @@ def simulate_in_batches(
     Returns:
         Simulations $x$.
     """
+    if theta.ndim == 1:
+        # Scalar parameters, e.g. from MCABC with a scalar prior. The simulator still
+        # gets batches of shape (batch_size,).
+        return simulate_in_batches(
+            lambda theta_batch: simulator(theta_batch[:, 0]),
+            theta[:, None],
+            sim_batch_size,
+            num_workers,
+            seed,
+            show_progress_bars,
+        )
     x = simulate_from_theta(
         simulator,
         theta,

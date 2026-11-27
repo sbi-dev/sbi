@@ -54,3 +54,15 @@ def test_seeded_simulate_in_batches_does_not_depend_on_num_workers():
 
     assert len(torch.unique(x, dim=0)) == 30
     assert torch.equal(x, x_with_workers)
+
+
+@pytest.mark.parametrize("batch_size", (1, None))
+def test_simulate_in_batches_with_scalar_parameters(batch_size):
+    """Parameters of shape (num_simulations,), e.g. from MCABC with a scalar prior."""
+    theta = torch.rand(10)
+
+    x = simulate_in_batches(
+        lambda theta: theta[:, None] + 1, theta, batch_size, show_progress_bars=False
+    )
+
+    assert torch.equal(x, theta[:, None] + 1)
