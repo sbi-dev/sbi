@@ -32,8 +32,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # The lowest supported torch (`torch>=` in pyproject.toml) on the lowest
+        # supported Python.
         python-version: ['3.11']
-        torch-version: ['1.13', '2.5']
+        torch-version: ['2.5.0']
+    env:
+      TORCH_VERSION: ${{ matrix.torch-version }}
 
     steps:
     - name: Checkout
@@ -47,16 +51,21 @@ jobs:
       uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
       with:
         python-version: ${{ matrix.python-version }}
+        activate-environment: true
         enable-cache: true
         cache-dependency-glob: "pyproject.toml"
 
-    - name: Install dependencies with uv
+    - name: Install dependencies with the pinned torch
+      # One resolve with the pin, so that no dependency (e.g. pyro-ppl) upgrades torch.
+      run: uv pip install -e ".[dev]" "torch==$TORCH_VERSION" --torch-backend cpu
+
+    - name: Check that the pinned torch is installed
       run: |
-        uv pip install torch==${{ matrix.torch-version }} --extra-index-url https://download.pytorch.org/whl/cpu
-        uv pip install -e .[dev]
+        uv run --no-sync python -c "import os, torch; print(torch.__version__); assert torch.__version__.split('+')[0] == os.environ['TORCH_VERSION']"
 
     - name: Run the selected tests without coverage
       env:
         PYTEST_MARKER: ${{ inputs.pytest-marker }}
+      # --no-sync: a plain `uv run` syncs the venv to uv.lock and replaces the pinned torch.
       run: |
-        uv run pytest -v -x -m "$PYTEST_MARKER" tests/
+        uv run --no-sync pytest -v -x -m "$PYTEST_MARKER" tests/
