@@ -41,6 +41,14 @@ from sbi.utils import (
 )
 from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
 
+_Sampler = Literal["direct", "filtered_direct", "rejection", "importance"]
+_SAMPLE_WITH: Dict[type, _Sampler] = {
+    DirectPosteriorParameters: "direct",
+    FilteredDirectPosteriorParameters: "filtered_direct",
+    RejectionPosteriorParameters: "rejection",
+    ImportanceSamplingPosteriorParameters: "importance",
+}
+
 
 class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
     r"""Neural Posterior Estimation with TabPFN (NPE-PFN).
@@ -286,12 +294,10 @@ class NPE_PFN(NeuralInference[ConditionalDensityEstimator]):
             )
 
         # Like the other trainers, a typed `posterior_parameters` selects the sampler.
-        use_filtered_direct = (
-            sample_with == "filtered_direct"
-            if posterior_parameters is None
-            else isinstance(posterior_parameters, FilteredDirectPosteriorParameters)
-        )
-        if use_filtered_direct:
+        if posterior_parameters is not None:
+            sample_with = _SAMPLE_WITH.get(type(posterior_parameters), sample_with)
+
+        if sample_with == "filtered_direct":
             full_context_input, full_context_condition = full_theta, full_x
 
             prior = self._resolve_prior(prior, sample_with)
