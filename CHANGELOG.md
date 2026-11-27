@@ -10,7 +10,7 @@
   * A state dict saved from such a zuko flow before this change does not load into a flow built after it. To rebuild the old network, pass `hidden_features=[w] * num_transforms`, for example `[50] * 5` at the defaults. Posteriors and inference objects saved with `save()` or pickled whole keep loading, because they store the network itself.
 * **Structured z-scoring uses the std over all values** ([#2240](https://github.com/sbi-dev/sbi/pull/2240)) instead of the mean of per-simulation stds, so z-scored inputs have variance one. Only newly built networks change.
 * **z-scoring leaves constant features unscaled** ([#2240](https://github.com/sbi-dev/sbi/pull/2240)): they get std one instead of `min_std`, which gave inputs up to 1e11. Only newly built networks change.
-* **z-scoring keeps float32 precision for data with a large mean and a small spread**: flows z-score as `(x - mean) / std`, and the std is computed from centred values. sbi warns when the std is below about 1e-4 of the mean.
+* **z-scoring keeps float32 precision for data with a large mean and a small spread** ([#2246](https://github.com/sbi-dev/sbi/pull/2246)): flows z-score as `(x - mean) / std`, and the std is computed from centred values. sbi warns when the std is below about 1e-4 of the mean.
   * Flows saved with this version do not load into older sbi; flows saved with older sbi still load.
 
 ## v0.27.0
