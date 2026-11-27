@@ -279,11 +279,70 @@ def assert_transform_to_unconstrained_supported(
         )
 
 
+def _shift_scale_to_mean_std(
+    state_dict: Dict[str, Tensor], prefix: str, shift: str, scale: str
+) -> None:
+    """Converts the z-scoring buffers of older sbi, `x * scale + shift`, in place to
+    `mean` and `std`, so that their state dicts still load."""
+    if prefix + shift in state_dict and prefix + scale in state_dict:
+        scale_t = state_dict.pop(prefix + scale)
+        state_dict[prefix + "mean"] = -state_dict.pop(prefix + shift) / scale_t
+        state_dict[prefix + "std"] = 1 / scale_t
+
+
+class StandardizingTransform(nflows_tf.Transform):
+    """nflows z-scoring `(x - mean) / std`, inverse `z * std + mean`.
+
+    Subtracting first keeps neighbouring float32 values apart; nflows'
+    `x * scale + shift` rounds a term of size mean / std before it cancels.
+    """
+
+    def __init__(self, mean: Tensor, std: Tensor):
+        super().__init__()
+        self.register_buffer("mean", mean)
+        self.register_buffer("std", std)
+
+    def _logabsdet(self, inputs: Tensor) -> Tensor:
+        logabsdet = -self.std.log().expand(inputs.shape[1:]).sum()
+        return logabsdet.expand(inputs.shape[0])
+
+    def forward(
+        self, inputs: Tensor, context: Optional[Tensor] = None
+    ) -> Tuple[Tensor, Tensor]:
+        return (inputs - self.mean) / self.std, self._logabsdet(inputs)
+
+    def inverse(
+        self, inputs: Tensor, context: Optional[Tensor] = None
+    ) -> Tuple[Tensor, Tensor]:
+        return inputs * self.std + self.mean, -self._logabsdet(inputs)
+
+    def _load_from_state_dict(self, state_dict, prefix, *args, **kwargs):
+        _shift_scale_to_mean_std(state_dict, prefix, "_shift", "_scale")
+        super()._load_from_state_dict(state_dict, prefix, *args, **kwargs)
+
+
+class ZukoStandardizingTransform(zuko.lazy.LazyTransform):
+    """zuko z-scoring `(x - mean) / std`, inverse `z * std + mean`, see
+    `StandardizingTransform`."""
+
+    def __init__(self, mean: Tensor, std: Tensor):
+        super().__init__()
+        self.register_buffer("mean", mean)
+        self.register_buffer("std", std)
+
+    def forward(self, c: Optional[Tensor] = None) -> TorchTransform:
+        return AffineTransform(loc=self.mean, scale=self.std).inv
+
+    def _load_from_state_dict(self, state_dict, prefix, *args, **kwargs):
+        _shift_scale_to_mean_std(state_dict, prefix, "loc", "scale")
+        super()._load_from_state_dict(state_dict, prefix, *args, **kwargs)
+
+
 def standardizing_transform(
     batch_t: Tensor,
     structured_dims: bool = False,
     min_std: float = 1e-14,
-) -> nflows_tf.PointwiseAffineTransform:
+) -> StandardizingTransform:
     """Builds standardizing transform for nflows
 
     Args:
@@ -298,73 +357,14 @@ def standardizing_transform(
     Returns:
         Affine transform for z-scoring
     """
-    t_mean, t_std = z_standardization(batch_t, structured_dims, min_std)
-    shift, scale = _z_score_affine(t_mean, t_std)
-    return _CenteredPointwiseAffineTransform(shift=shift, scale=scale)
+    return StandardizingTransform(*z_standardization(batch_t, structured_dims, min_std))
 
 
-def _z_score_affine(mean: Tensor, std: Tensor) -> Tuple[Tensor, Tensor]:
-    """`shift` and `scale` of the z-scoring `x * scale + shift`, chosen so that
-    `-shift / scale`, which the centred transforms compute, gives back `mean`.
-
-    Rounding would otherwise move the centre by up to a float32 step of the mean,
-    several stds when the spread is only a few steps wide. Up to 64 float32 steps
-    more in `scale` (a relative change below 1e-5) make the division exact.
-    """
-    scale = 1 / std
-    for _ in range(64):
-        off = mean * scale / scale != mean
-        if not off.any():
-            break
-        scale = torch.where(off, torch.nextafter(scale, scale + 1), scale)
-    return -mean * scale, scale
-
-
-class _CenteredPointwiseAffineTransform(nflows_tf.PointwiseAffineTransform):
-    """z-scoring as `(x - mean) * scale`, inverse `z / scale + mean`, with
-    `mean = -shift / scale`.
-
-    The parent's `x * scale + shift` and `(z - shift) / scale` round a term of
-    about mean / std before it cancels, and so can merge distinct float32 values.
-    The buffers are the parent's, so state dicts load in both directions.
-    """
-
-    def forward(
-        self, inputs: Tensor, context: Optional[Tensor] = None
-    ) -> Tuple[Tensor, Tensor]:
-        batch_size, *batch_shape = inputs.size()
-        mean = -self._shift / self._scale
-        outputs = (inputs - mean) * self._scale
-        return outputs, self._batch_logabsdet(batch_shape).expand(batch_size)
-
-    def inverse(
-        self, inputs: Tensor, context: Optional[Tensor] = None
-    ) -> Tuple[Tensor, Tensor]:
-        batch_size, *batch_shape = inputs.size()
-        mean = -self._shift / self._scale
-        outputs = inputs / self._scale + mean
-        return outputs, -self._batch_logabsdet(batch_shape).expand(batch_size)
-
-
-class _CenteredAffineTransform(AffineTransform):
-    """`AffineTransform` with the arithmetic of `_CenteredPointwiseAffineTransform`,
-    with `mean = -loc / scale`."""
-
-    def _call(self, x: Tensor) -> Tensor:
-        mean = -self.loc / self.scale
-        return (x - mean) * self.scale
-
-    def _inverse(self, y: Tensor) -> Tensor:
-        mean = -self.loc / self.scale
-        return y / self.scale + mean
-
-
-# NOTE: we need a separate function for zuko to return the precise type for pyright.
 def standardizing_transform_zuko(
     batch_t: Tensor,
     structured_dims: bool = False,
     min_std: float = 1e-14,
-) -> zuko.flows.UnconditionalTransform:
+) -> ZukoStandardizingTransform:
     """Builds standardizing transform for Zuko flows
 
     Args:
@@ -379,10 +379,8 @@ def standardizing_transform_zuko(
     Returns:
         Affine transform for z-scoring
     """
-    t_mean, t_std = z_standardization(batch_t, structured_dims, min_std)
-    loc, scale = _z_score_affine(t_mean, t_std)
-    return zuko.flows.UnconditionalTransform(
-        _CenteredAffineTransform, loc=loc, scale=scale, buffer=True
+    return ZukoStandardizingTransform(
+        *z_standardization(batch_t, structured_dims, min_std)
     )
 
 
