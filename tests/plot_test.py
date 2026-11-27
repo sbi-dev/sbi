@@ -23,6 +23,8 @@ from sbi.analysis import (
     pairplot,
     plot_summary,
     plot_tarp,
+    pp_plot,
+    pp_plot_lc2st,
     sbc_rank_plot,
 )
 from sbi.analysis.plotting_classes import (
@@ -958,4 +960,61 @@ def test_plots_accept_device_and_grad_tensors(device):
         torch.zeros(2), scale_tril=torch.eye(2)
     )
     conditional_pairplot(cpu_density, condition, [[-3.0, 3.0]], resolution=10)
+    close("all")
+
+
+@pytest.mark.parametrize("scores_type", ["list", "dict"])
+@pytest.mark.parametrize("null_type", ["list", "dict"])
+def test_pp_plot_and_pp_plot_lc2st_accept_list_and_dict(
+    scores_type: str, null_type: str
+):
+    """pp_plot and pp_plot_lc2st accept List and Dict inputs for scores and
+    scores_null.
+    """
+    rng = np.random.default_rng(0)
+    scores_data = [rng.uniform(size=50), rng.uniform(size=50)]
+    null_data = [rng.uniform(size=50), rng.uniform(size=50), rng.uniform(size=50)]
+    true_null = rng.uniform(size=50)
+
+    if scores_type == "dict":
+        scores = {"est_A": scores_data[0], "est_B": scores_data[1]}
+    else:
+        scores = scores_data
+
+    if null_type == "dict":
+        scores_null = {
+            "trial_1": null_data[0],
+            "trial_2": null_data[1],
+            "trial_3": null_data[2],
+        }
+    else:
+        scores_null = null_data
+
+    # Test pp_plot
+    ax = pp_plot(scores, scores_null, true_null, conf_alpha=0.05)
+    assert isinstance(ax, Axes)
+    if scores_type == "dict":
+        legend = ax.legend()
+        legend_texts = [t.get_text() for t in legend.get_texts()]
+        assert "est_A" in legend_texts
+        assert "est_B" in legend_texts
+
+    # Test explicit labels override
+    ax_labeled = pp_plot(
+        scores, scores_null, true_null, conf_alpha=0.05, labels=["Model1", "Model2"]
+    )
+    legend_labeled = ax_labeled.legend()
+    labeled_texts = [t.get_text() for t in legend_labeled.get_texts()]
+    assert "Model1" in labeled_texts
+    assert "Model2" in labeled_texts
+
+    # Test pp_plot_lc2st
+    ax_lc2st = pp_plot_lc2st(probs=scores, probs_null=scores_null, conf_alpha=0.05)
+    assert isinstance(ax_lc2st, Axes)
+
+    # Test dictionary with None as key supplies "None" as label
+    ax_none = pp_plot({None: scores_data[0]}, null_data, true_null, conf_alpha=0.05)
+    legend_none = ax_none.legend()
+    assert "None" in [t.get_text() for t in legend_none.get_texts()]
+
     close("all")
