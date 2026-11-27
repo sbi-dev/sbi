@@ -1055,7 +1055,7 @@ def test_z_scoring_keeps_float32_resolution():
     batch[0] += 8  # one float32 step
     x = (1e6 + 0.0625 * torch.arange(8, dtype=torch.float64)).float().unsqueeze(1)
 
-    with pytest.warns(UserWarning, match="float32"):
+    with pytest.warns(UserWarning, match="resolves fewer"):
         for stats_fn in (z_standardization, _finite_z_score_stats):
             for structured in (False, True):
                 mean, std = stats_fn(batch, structured)

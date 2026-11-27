@@ -487,29 +487,29 @@ def z_standardization(
     values.sub_(t_mean)
     t_mean = t_mean + values.mean(dim=0)
     t_std = values.std(dim=0)
-    _warn_if_below_float32_resolution(t_mean, t_std, constant)
+    _warn_if_below_resolution(t_mean, t_std, constant)
     t_std = torch.where(constant, torch.ones_like(t_std), t_std)
     return t_mean, t_std.clamp(min=min_std)
 
 
-def _warn_if_below_float32_resolution(mean: Tensor, std: Tensor, skip: Tensor) -> None:
-    """Warn about features whose std is below 1e-4 of their mean.
-
-    float32 then resolves fewer than about 1000 values per std, so the data has
-    lost precision before z-scoring.
+def _warn_if_below_resolution(mean: Tensor, std: Tensor, skip: Tensor) -> None:
+    """Warn about features whose std spans fewer than about 1000 representable
+    values at their mean: the data lost precision before z-scoring.
 
     Args:
-        mean: Mean of each feature.
-        std: Standard deviation of each feature.
+        mean: Mean of each feature, or one pooled mean.
+        std: Standard deviation of each feature, or one pooled std.
         skip: Features not to check, e.g. constant ones.
     """
-    low = (~skip & (std < 1e-4 * mean.abs())).flatten()
+    eps = torch.finfo(std.dtype).eps
+    low = ~skip & (std < 1000 * eps * mean.abs())
     if low.any():
+        where = f"Dimension(s) {low.flatten().nonzero().flatten().tolist()}"
         warnings.warn(
-            f"Dimension(s) {low.nonzero().flatten().tolist()} have a std below 1e-4 "
-            "of their mean, so float32 resolves fewer than about 1000 values per "
-            "std. Subtract an offset from these values before training (and from "
-            "the prior, for parameters).",
+            f"{where if low.ndim else 'The data'} have a std below {1000 * eps:.0e} "
+            f"of their mean, so {std.dtype} resolves fewer than about 1000 values "
+            "per std. Subtract an offset before training (and from the prior, for "
+            "parameters).",
             UserWarning,
             stacklevel=3,
         )

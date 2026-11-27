@@ -35,7 +35,7 @@ from sbi.neural_nets.net_builders.estimator_configs import (
 )
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
-    _warn_if_below_float32_resolution,
+    _warn_if_below_resolution,
     build_z_scored_embedding_net,
     z_score_parser,
     z_standardization,
@@ -1558,10 +1558,10 @@ def _finite_z_score_stats(
     # A float32 mean can be steps off: centre a second time on the mean of the
     # centred values, which keeps that error out of the std.
     residual = centered.sum(dim=dims) / count.clamp(min=1)
-    centered = torch.where(finite, centered - residual, torch.zeros_like(centered))
+    centered.sub_(residual).masked_fill_(~finite, 0)
     var = centered.pow(2).sum(dim=dims) / (count - 1).clamp(min=1)
     mean = torch.where(constant, highest, mean + residual)
-    _warn_if_below_float32_resolution(mean, var.sqrt(), constant | too_few)
+    _warn_if_below_resolution(mean, var.sqrt(), constant | too_few)
     std = torch.where(constant | too_few, torch.ones_like(var), var).sqrt()
     return mean, std.clamp(min=min_std)
 
