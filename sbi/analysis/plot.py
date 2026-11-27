@@ -1858,17 +1858,13 @@ def _sbc_rank_plot(
             assert ax.size >= num_parameters, (
                 "There must be at least as many subplots as parameters."
             )
-            num_rows = ax.shape[0] if ax.ndim > 1 else 1
             if fig is None:
                 fig = ax.flat[0].figure
         assert ax is not None
 
-        col_idx, row_idx = 0, 0
         for ii, ranki in enumerate(ranks_list):
             for jj in range(num_parameters):
-                col_idx = jj if num_rows == 1 else jj % num_cols
-                row_idx = jj // num_cols
-                plt.sca(ax[col_idx] if num_rows == 1 else ax[row_idx, col_idx])
+                plt.sca(ax.flat[jj])
 
                 if plot_type in ("cdf", "cdf-diff"):
                     _plot_ranks_as_cdf(
@@ -1917,10 +1913,8 @@ def _sbc_rank_plot(
             plt.sca(ax.flat[0])
             _sbc_legend(legend_kwargs)
         # Remove empty subplots.
-        col_idx += 1
-        while num_rows > 1 and col_idx < num_cols:
-            ax[row_idx, col_idx].axis("off")
-            col_idx += 1
+        for unused_ax in ax.flat[num_parameters:]:
+            unused_ax.axis("off")
 
     # When there is only one set of ranks show all params in a single subplot.
     # Only "cdf" and "cdf-diff" get here: "hist" always uses subplots.
