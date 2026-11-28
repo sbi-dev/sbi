@@ -30,16 +30,49 @@ def importance_sample(
     Returns:
         Samples and logarithm of importance weights.
     """
+    if num_samples == 0:
+        try:
+            samples = proposal.sample((0,))
+        except Exception:
+            samples = proposal.sample((1,))[:0]
+        device = getattr(potential_fn, "device", samples.device)
+        samples = samples.to(device)
+        log_importance_weights = torch.empty(0, dtype=samples.dtype, device=device)
+        return samples, log_importance_weights
+
     # The proposal's own progress bar, if it has one, is the only bar here. It is
     # suppressed like a nested bar unless progress bars are requested.
     with nullcontext() if show_progress_bars else nested_pbar_context():
         samples = proposal.sample((num_samples,))
 
-    # One value per sample: a 1-D distribution without `Independent` returns
-    # (N, 1), which would broadcast against (N,) to an (N, N) tensor.
-    potential_logprobs = potential_fn(samples).reshape(num_samples)
-    proposal_logprobs = proposal.log_prob(samples).reshape(num_samples)
+    potential_device = getattr(potential_fn, "device", None)
+    if potential_device is not None and samples.device != torch.device(
+        potential_device
+    ):
+        samples_for_potential = samples.to(potential_device)
+    else:
+        samples_for_potential = samples
+
+    potential_logprobs = potential_fn(samples_for_potential)
+    proposal_logprobs = proposal.log_prob(samples)
+
+    if potential_logprobs.ndim > 1:
+        potential_logprobs = potential_logprobs.reshape(num_samples, -1).sum(dim=-1)
+    else:
+        potential_logprobs = potential_logprobs.reshape(num_samples)
+
+    if proposal_logprobs.ndim > 1:
+        proposal_logprobs = proposal_logprobs.reshape(num_samples, -1).sum(dim=-1)
+    else:
+        proposal_logprobs = proposal_logprobs.reshape(num_samples)
+
+    if potential_logprobs.device != proposal_logprobs.device:
+        proposal_logprobs = proposal_logprobs.to(potential_logprobs.device)
+
     log_importance_weights = potential_logprobs - proposal_logprobs
+
+    if samples.device != log_importance_weights.device:
+        samples = samples.to(log_importance_weights.device)
 
     return samples, log_importance_weights
 
@@ -57,6 +90,8 @@ def exponentiate_weights(log_weights: Tensor) -> Tensor:
         Tensor: Importance weights.
     """
     log_weights = log_weights[torch.isfinite(log_weights)]
+    if log_weights.numel() == 0:
+        return log_weights
     logweights_max = log_weights.max()
     weights = torch.exp(log_weights - logweights_max)
     return weights
@@ -77,6 +112,8 @@ def largest_weight_indices(weights: Tensor) -> Tensor:
     # Yao, Vehtari, Simpson, Gelman, 2018
     number_of_weights = int(min(len(weights) / 5, 3 * sqrt(len(weights))))
     _, inds = weights.sort()
+    if number_of_weights == 0:
+        return inds[:0]
     return inds[-number_of_weights:]
 
 

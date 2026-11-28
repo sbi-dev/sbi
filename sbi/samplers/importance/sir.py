@@ -41,6 +41,13 @@ def sampling_importance_resampling(
         RuntimeError: If none of the first 100_000 or more candidates has a finite
             importance weight.
     """
+    if num_samples == 0:
+        try:
+            dummy = proposal.sample((0,))
+        except Exception:
+            dummy = proposal.sample((1,))[:0]
+        device = getattr(potential_fn, "device", dummy.device)
+        return torch.empty((0, *dummy.shape[1:]), dtype=dummy.dtype, device=device)
 
     selected_samples = []
 
@@ -68,7 +75,10 @@ def sampling_importance_resampling(
             uniform_decision = torch.rand(batch_size, 1, device=log_weights.device)
             # Strict, so that a draw of 0 cannot select a zero-weight candidate.
             mask = torch.cumsum(weights > uniform_decision, -1) == 1
-            samples = thetas.reshape(batch_size, num_candidate_samples, -1)[mask]
+            thetas = thetas.to(log_weights.device)
+            samples = thetas.reshape(
+                batch_size, num_candidate_samples, *thetas.shape[1:]
+            )[mask]
             selected_samples.append(samples)
 
         num_remaining -= samples.shape[0]
@@ -90,5 +100,5 @@ def sampling_importance_resampling(
             )
     pbar.close()
 
-    selected_samples = torch.cat(selected_samples)
+    selected_samples = torch.cat(selected_samples, dim=0)
     return selected_samples
