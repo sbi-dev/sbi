@@ -97,7 +97,7 @@ def marginal_plot(
         subset: List containing the dimensions to plot. E.g. subset=[1,3] will plot
             plot only the 1st and 3rd dimension but will discard the 0th and 2nd (and,
             if they exist, the 4th, 5th and so on).
-        diag: Plotting style for 1D marginals, {hist, kde cond, None}.
+        diag: Plotting style for 1D marginals, {hist, scatter, kde, None}.
         figsize: Size of the entire figure.
         labels: List of strings specifying the names of the parameters.
         ticks: Position of the ticks.
@@ -116,6 +116,8 @@ def marginal_plot(
     sample_data, labels, limits, ticks, sample_names = _unpack_labeled_samples(
         samples, labels, limits, ticks
     )
+
+    _validate_plotting_style(diag, DiagLiteral, "diag")
 
     # backwards compatibility
     if len(kwargs) > 0:
@@ -368,7 +370,8 @@ def plt_hist_1d(
         if diag_kwargs["bin_heuristic"] == "Freedman-Diaconis":
             # The Freedman-Diaconis heuristic
             binsize = 2 * iqr(samples) * len(samples) ** (-1 / 3)
-            hist_kwargs["bins"] = np.arange(limits[0], limits[1] + binsize, binsize)
+            low, high = np.asarray(limits)
+            hist_kwargs["bins"] = np.arange(low, high + binsize, binsize)
         else:
             # TODO: add more bin heuristics
             pass
@@ -1530,7 +1533,6 @@ def _arrange_grid(
     excl_upper = all(v is None for v in upper_funcs)
     excl_diag = all(v is None for v in diag_funcs)
     flat = excl_lower and excl_upper
-    one_dim = dim == 1
     _legend_handles: Optional[tuple] = None  # type: ignore
     # select the subset of rows and cols to be plotted
     if flat:
@@ -1548,6 +1550,9 @@ def _arrange_grid(
             rows,
             cols,
         ), f"Passed axes must match subplot shape: {rows, cols}."
+    # `axes` is one Axes, a row of Axes or a grid, depending on the layout and on
+    # the caller. Index the panels through one (rows, cols) grid.
+    grid = np.asarray(axes, dtype=object).reshape(rows, cols)
 
     # Style figure
     fig.subplots_adjust(**fig_kwargs.fig_subplots_adjust)
@@ -1563,12 +1568,7 @@ def _arrange_grid(
             else:
                 current = "lower"
 
-            if one_dim:
-                ax = axes  # pyright: ignore reportIndexIssue
-            elif flat:
-                ax = axes[col_idx]  # pyright: ignore reportIndexIssue
-            else:
-                ax = axes[row_idx, col_idx]  # pyright: ignore reportIndexIssue
+            ax = grid[row_idx, col_idx]
             # Diagonals
             _format_subplot(
                 ax,  # pyright: ignore reportArgumentType
@@ -1587,11 +1587,13 @@ def _arrange_grid(
                 if excl_diag:
                     ax.axis("off")  # pyright: ignore reportOptionalMemberAccess
                 else:
+                    # On the diagonal, row == col. One-row plots only have a
+                    # meaningful col, so select the dimension by col.
                     for sample_ind, sample in enumerate(samples):
                         diag_f = diag_funcs[sample_ind]
                         diag_kw = diag_kwargs[sample_ind]
                         # Override diagonal for discrete dimensions: use bar.
-                        if row in discrete_set and diag_f is not plt_bar_1d:
+                        if col in discrete_set and diag_f not in (None, plt_bar_1d):
                             diag_f = plt_bar_1d
                             bar_defaults = get_default_diag_kwargs("bar", sample_ind)
                             user_mpl = (diag_kw or {}).get("mpl_kwargs", {})
@@ -1601,7 +1603,7 @@ def _arrange_grid(
                                 )
                             diag_kw = bar_defaults
                         # Reverse: bar on a continuous dimension → fall back to hist.
-                        elif row not in discrete_set and diag_f is plt_bar_1d:
+                        elif col not in discrete_set and diag_f is plt_bar_1d:
                             diag_f = plt_hist_1d
                             diag_kw = get_default_diag_kwargs("hist", sample_ind)
                         # Add sample label on the first diagonal cell for legend.
@@ -1615,7 +1617,7 @@ def _arrange_grid(
                                 fig_kwargs.samples_labels[sample_ind]  # pyright: ignore reportOptionalSubscript
                             )
                         if callable(diag_f):
-                            diag_f(ax, sample[:, row], limits[row], diag_kw)
+                            diag_f(ax, sample[:, col], limits[col], diag_kw)
 
                 if len(points) > 0:
                     extent = ax.get_ylim()  # pyright: ignore reportOptionalMemberAccess
@@ -1679,41 +1681,39 @@ def _arrange_grid(
     # first diagonal cell.
     if fig_kwargs.legend and _legend_handles is not None:
         handles, legend_labels = _legend_handles
-        if not one_dim and not flat:
+        if not flat:
             legend_kw = fig_kwargs.legend_kwargs.copy()
             legend_kw.setdefault("loc", "center")
             legend_kw.setdefault("frameon", False)
             if excl_lower and rows > 1:
                 # Lower triangle is empty: use bottom-left cell.
-                legend_ax = axes[-1, 0]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
+                legend_ax = grid[-1, 0]
                 _place_legend_in_empty_cell(
                     legend_ax, handles, legend_labels, legend_kw
                 )
             elif excl_upper and rows > 1:
                 # Upper triangle is empty: use top-right cell.
-                legend_ax = axes[0, -1]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
+                legend_ax = grid[0, -1]
                 _place_legend_in_empty_cell(
                     legend_ax, handles, legend_labels, legend_kw
                 )
             else:
                 # Both triangles plotted: fall back to first diagonal cell.
-                axes[0, 0].legend(handles, legend_labels, **fig_kwargs.legend_kwargs)  # pyright: ignore[reportIndexIssue, reportOptionalSubscript, reportOptionalMemberAccess]
-        elif one_dim:
-            axes.legend(handles, legend_labels, **fig_kwargs.legend_kwargs)  # pyright: ignore[reportOptionalMemberAccess]
-        elif flat:
-            axes[0].legend(handles, legend_labels, **fig_kwargs.legend_kwargs)  # pyright: ignore[reportIndexIssue, reportOptionalSubscript, reportOptionalMemberAccess]
+                grid[0, 0].legend(handles, legend_labels, **fig_kwargs.legend_kwargs)
+        else:
+            grid[0, 0].legend(handles, legend_labels, **fig_kwargs.legend_kwargs)
 
     # Add dots if we subset
     if len(subset) < dim:
         if flat:
-            ax = axes[len(subset) - 1]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
+            ax = grid[0, -1]
             x0, x1 = ax.get_xlim()
             y0, y1 = ax.get_ylim()
             text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}  # pyright: ignore[reportOptionalOperand]
             ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
         else:
             for row in range(len(subset)):
-                ax = axes[row, len(subset) - 1]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
+                ax = grid[row, -1]
                 x0, x1 = ax.get_xlim()
                 y0, y1 = ax.get_ylim()
                 text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}  # pyright: ignore[reportOptionalOperand]

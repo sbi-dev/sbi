@@ -862,6 +862,50 @@ def test_plotting_style_arguments_validation(kwargs):
     close()
 
 
+def test_marginal_plot_validates_diag_style():
+    """`marginal_plot` rejects an unknown `diag` style instead of drawing nothing."""
+    with pytest.raises(ValueError, match="Expected diag"):
+        marginal_plot(torch.randn(100, 3), diag="cond")
+
+
+@pytest.mark.filterwarnings("error:__array__ implementation:DeprecationWarning")
+def test_pairplot_hist_bins_from_tensor_limits():
+    """The histogram bins are computed without numpy converting torch tensors."""
+    pairplot(torch.randn(100, 2))
+    close()
+
+
+@pytest.mark.parametrize(
+    "plot, dims, subset, centers, axes_shape",
+    [
+        (marginal_plot, 2, None, [0, 50], None),
+        (marginal_plot, 1, None, [0], None),
+        (marginal_plot, 2, [0], [0], None),
+        (pairplot, 2, [0], [0], None),
+        (marginal_plot, 2, None, [0, 50], (1, 2)),
+        (pairplot, 2, [0], [0], (1, 1)),
+    ],
+    ids=[
+        "marginal_plot",
+        "marginal_plot_1d",
+        "marginal_plot_subset",
+        "pairplot_subset",
+        "marginal_plot_caller_axes",
+        "pairplot_subset_caller_axes",
+    ],
+)
+def test_plot_panels_show_their_own_dimension(plot, dims, subset, centers, axes_shape):
+    """Each panel of a one-row or single-panel plot shows its own dimension, also
+    on axes passed by the caller."""
+    samples = torch.stack([torch.randn(500), torch.randn(500) + 50], dim=1)[:, :dims]
+    fig, axes = subplots(*axes_shape, squeeze=False) if axes_shape else (None, None)
+    _, axes = plot(samples, subset=subset, fig=fig, axes=axes)
+    for ax, center in zip(np.ravel(axes), centers, strict=True):
+        extent = ax.patches[0].get_path().get_extents()
+        assert center - 10 < extent.x0 < extent.x1 < center + 10
+    close()
+
+
 # --- Tests for discrete_indices support ---
 
 
@@ -880,6 +924,18 @@ def test_pairplot_discrete_indices(diag, upper):
     samples = _make_mixed_samples()
     fig, _ = pairplot(samples, discrete_indices=[2, 3], diag=diag, upper=upper)
     assert isinstance(fig, Figure)
+    close()
+
+
+@pytest.mark.parametrize("upper", (None, "hist"), ids=["one_row", "grid"])
+def test_discrete_diagonal_keeps_disabled_samples_hidden(upper):
+    """A sample set with `diag=None` stays hidden on a discrete dimension."""
+    samples = torch.randint(0, 4, (200, 2)).float()
+    _, axes = pairplot(
+        [samples, samples], diag=[None, "hist"], upper=upper, discrete_indices=[0]
+    )
+    # One sample set draws one bar per distinct value.
+    assert len(np.ravel(axes)[0].patches) == len(torch.unique(samples[:, 0]))
     close()
 
 
