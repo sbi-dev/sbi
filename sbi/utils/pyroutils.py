@@ -51,8 +51,9 @@ class EstimatorDistribution(pyro.distributions.TorchDistribution):
         condition_shape, event_shape = self._get_condition_and_event_shapes()
         self._check_condition_shape(condition)
         self._condition = condition
+        cond_dim = len(condition_shape)
         super().__init__(
-            batch_shape=condition.shape[: -len(condition_shape)],
+            batch_shape=condition.shape[: condition.dim() - cond_dim],
             event_shape=event_shape,
         )
 
@@ -128,7 +129,8 @@ class ConditionalDensityEstimatorDistribution(EstimatorDistribution):
         """Compute log probability of `x`."""
         # ConditionalDensityEstimator expects a batch shape of (batch_dim,)
         # and sample shape of (sample_dim,)
-        sample_shape = x.shape[: -len(self.event_shape) - len(self.batch_shape)]
+        trailing_dims = len(self.event_shape) + len(self.batch_shape)
+        sample_shape = x.shape[: x.dim() - trailing_dims]
         x = x.reshape(-1, self.batch_shape.numel(), *self.event_shape)
         lp = self.estimator.log_prob(x, condition=self._condition_reshaped)
         # reshape (sample_dim, batch_dim,) -> (*sample_shape, *batch_shape)
@@ -171,7 +173,8 @@ class RatioEstimatorDistribution(EstimatorDistribution):
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         """Compute log probability of `x`."""
         # RatioEstimator expects condition and x to have the same leading shape
-        sample_shape = x.shape[: -len(self.event_shape) - len(self.batch_shape)]
+        trailing_dims = len(self.event_shape) + len(self.batch_shape)
+        sample_shape = x.shape[: x.dim() - trailing_dims]
         condition_shape, _ = self._get_condition_and_event_shapes()
         condition = self.condition.expand(
             *sample_shape, *self.batch_shape, *condition_shape

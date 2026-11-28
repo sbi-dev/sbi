@@ -79,3 +79,30 @@ def test_api_ratio_estimator(ratio_estimator, theta_shape, x_shape):
         nsamples,
     ), f"""unnormalized_log_ratio shape is not correct. It is of shape
     {unnormalized_log_ratio.shape}, but should be {(nsamples,)}"""
+
+
+@pytest.mark.parametrize(
+    "theta_shape, x_shape",
+    [
+        (torch.Size([]), torch.Size([])),
+        (torch.Size([2]), torch.Size([])),
+        (torch.Size([]), torch.Size([2])),
+    ],
+)
+def test_ratio_estimator_scalar_shapes(theta_shape, x_shape):
+    """Test RatioEstimator._get_shape_prefix with scalar event shapes."""
+    net = torch.nn.Identity()
+    estimator = RatioEstimator(net=net, theta_shape=theta_shape, x_shape=x_shape)
+
+    nsamples = 10
+    batch_theta = torch.randn(nsamples, *theta_shape)
+    batch_x = torch.randn(nsamples, *x_shape)
+
+    prefix = estimator._get_shape_prefix(batch_theta, batch_x)
+    assert prefix == torch.Size([nsamples])
+
+    # Also test single observation (no batch dimension)
+    single_theta = torch.zeros(theta_shape)
+    single_x = torch.zeros(x_shape)
+    single_prefix = estimator._get_shape_prefix(single_theta, single_x)
+    assert single_prefix == torch.Size([])

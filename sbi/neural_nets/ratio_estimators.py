@@ -93,8 +93,10 @@ class RatioEstimator(ConditionalEstimator):
         Raises:
             ValueError: If the `batch_shape`s do not agree.
         """
-        theta_prefix = theta.shape[: -len(self.theta_shape)]
-        x_prefix = x.shape[: -len(self.x_shape)]
+        theta_dim = len(self.theta_shape)
+        x_dim = len(self.x_shape)
+        theta_prefix = theta.shape[: theta.dim() - theta_dim]
+        x_prefix = x.shape[: x.dim() - x_dim]
         if theta_prefix != x_prefix:
             raise ValueError(
                 f"{tuple(theta_prefix)=} != {tuple(x_prefix)=}. \

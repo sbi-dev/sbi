@@ -637,7 +637,7 @@ class VectorFieldPosterior(NeuralPosterior):
             )
         num_samples = torch.Size(sample_shape).numel()
         condition_dim = len(self.vector_field_estimator.condition_shape)
-        batch_shape = x.shape[:-condition_dim]
+        batch_shape = x.shape[: x.dim() - condition_dim]
         batch_size = batch_shape.numel()
         self.potential_fn = self.potential_fn.bind(x)
 

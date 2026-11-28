@@ -65,7 +65,9 @@ class Diffuser:
         condition_dim = len(self.condition_shape)
         # TODO: this is the iid setting and we don't want to generate num_obs samples,
         # but only one sample given the condition.
-        self.batch_shape = vector_field_potential.x_o.shape[:-condition_dim]
+        self.batch_shape = vector_field_potential.x_o.shape[
+            : vector_field_potential.x_o.dim() - condition_dim
+        ]
 
     def set_predictor(
         self,

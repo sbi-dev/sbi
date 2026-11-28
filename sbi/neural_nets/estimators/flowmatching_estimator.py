@@ -233,8 +233,10 @@ class FlowMatchingEstimator(ConditionalVectorFieldEstimator):
             The estimated vector field in original space.
         """
         # Continue with standard processing (broadcast shapes etc.)
-        batch_shape_input = input.shape[: -len(self.input_shape)]
-        batch_shape_cond = condition.shape[: -len(self.condition_shape)]
+        batch_shape_input = input.shape[: input.dim() - len(self.input_shape)]
+        batch_shape_cond = condition.shape[
+            : condition.dim() - len(self.condition_shape)
+        ]
         batch_shape = torch.broadcast_shapes(
             batch_shape_input,
             batch_shape_cond,

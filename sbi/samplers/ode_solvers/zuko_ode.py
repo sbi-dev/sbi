@@ -100,7 +100,7 @@ class ZukoNeuralODE(NeuralODE):
                 f"condition_shape {tuple(self.condition_shape)} requires at least "
                 f"{cond_event_dims} dimensions."
             )
-        actual_event_shape = condition.shape[-cond_event_dims:]
+        actual_event_shape = condition.shape[condition.dim() - cond_event_dims :]
         if actual_event_shape != self.condition_shape:
             raise ValueError(
                 f"Condition tensor event shape {tuple(actual_event_shape)} does not "
@@ -116,11 +116,10 @@ class ZukoNeuralODE(NeuralODE):
             **kwargs,
         )
 
+        batch_shape = condition.shape[: condition.dim() - cond_event_dims]
         return NormalizingFlow(
             transform=transform,
-            base=DiagNormal(self.mean_base, self.std_base).expand(
-                condition.shape[: -len(self.condition_shape)]
-            ),
+            base=DiagNormal(self.mean_base, self.std_base).expand(batch_shape),
         )
 
     def _f_condition_last(self, t, input, condition):
