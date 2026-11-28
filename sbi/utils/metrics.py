@@ -536,9 +536,7 @@ def posterior_zscore(
     # Keep `true_theta` in torch and on the device of the samples: converting it
     # to numpy fails for tensors on a GPU or tensors that require grad.
     true_theta = torch.atleast_1d(
-        torch.as_tensor(
-            true_theta, dtype=post_samples.dtype, device=post_samples.device
-        )
+        torch.as_tensor(true_theta, device=post_samples.device)
     )
     if post_samples.ndim == 1:
         post_samples = post_samples[:, None]
