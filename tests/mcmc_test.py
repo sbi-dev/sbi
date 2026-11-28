@@ -308,6 +308,28 @@ def test_latest_sample_raises_when_more_chains_than_stored():
 
 
 @pytest.mark.mcmc
+def test_latest_sample_batched_continues_each_x_own_chains():
+    """Each x of `sample_batched` continues its own chains, not those of the first."""
+    prior = BoxUniform(low=-2 * ones(2), high=2 * ones(2))
+
+    def potential_fn(theta, x):
+        return -((theta - x) ** 2).sum(axis=-1)
+
+    posterior = build_from_potential(potential_fn, prior, x=zeros(1, 2))
+    x = torch.tensor([[-1.0, -1.0], [1.0, 1.0]])
+    posterior.sample_batched((5,), x=x, num_chains=3, show_progress_bars=False)
+
+    initial_params = posterior._get_initial_params_batched(
+        x,
+        init_strategy="latest_sample",
+        num_chains_per_x=3,
+        num_workers=1,
+        show_progress_bars=False,
+    )
+    assert torch.equal(initial_params, posterior._mcmc_init_params)
+
+
+@pytest.mark.mcmc
 def test_direct_mcmc_unconditional():
     "Test MCMCPosterior from user defined potential (unconditional)"
     num_samples = 100
