@@ -13,6 +13,7 @@ from torch import nn
 from sbi.diagnostics.misspecification import (
     calc_misspecification_logprob,
     calc_misspecification_mmd,
+    compute_rbf_mmd,
 )
 from sbi.inference import NPE
 from sbi.inference.trainers.marginal import MarginalTrainer
@@ -265,6 +266,27 @@ def test_mmd_does_not_depend_on_the_order_of_x():
     # Over 200 seeds the ratio stayed below 2.9 with random rows and above 6.6 when
     # the observed MMD took the first rows of x.
     assert mmd < 4 * mmds_baseline.max()
+
+
+def test_unbiased_mmd_raises_for_a_single_observation():
+    """The unbiased MMD needs two samples per set: raise and point to the biased MMD."""
+    x = torch.randn(2000, 2)
+    x_obs = torch.tensor([[50.0, 50.0]])
+
+    with pytest.raises(ValueError, match="mmd_mode='biased'"):
+        calc_misspecification_mmd(x_obs=x_obs, x=x, n_shuffle=20, mmd_mode="unbiased")
+
+
+def test_unbiased_mmd_leaves_out_the_kernel_diagonal():
+    """For two samples of one distribution the unbiased MMD must average to ~0."""
+    torch.manual_seed(0)
+    mmds = torch.stack([
+        compute_rbf_mmd(torch.randn(10, 2), torch.randn(10, 2), 1.0, mode="unbiased")
+        for _ in range(300)
+    ])
+
+    # With the diagonal included the mean was 0.2295, about 1/(n-1) + 1/(m-1) = 0.222.
+    assert abs(mmds.mean()) < 0.03
 
 
 def test_mmd_raises_for_non_finite_mmd():
