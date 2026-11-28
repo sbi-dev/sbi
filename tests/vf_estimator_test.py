@@ -1048,3 +1048,49 @@ def test_vector_field_estimators_scalar_condition():
     s = score(theta, x, t)
     assert s.shape == (10, 2)
     assert torch.isfinite(s).all()
+
+
+def test_masked_conditional_estimator_check_input_shape():
+    """Verify MaskedConditionalEstimator._check_input_shape with various shapes."""
+    from sbi.neural_nets.estimators.base import MaskedConditionalEstimator
+
+    class DummyMaskedEstimator(MaskedConditionalEstimator):
+        def __init__(self, input_shape):
+            super().__init__(input_shape=input_shape)
+
+        def loss(self, input, condition, mask):
+            return torch.tensor(0.0)
+
+    est_scalar = DummyMaskedEstimator(input_shape=())
+    est_scalar._check_input_shape(torch.randn(10))
+    est_scalar._check_input_shape(torch.tensor(1.0))
+
+    est_2d = DummyMaskedEstimator(input_shape=(3,))
+    est_2d._check_input_shape(torch.randn(10, 3))
+    with pytest.raises(ValueError, match="does not match"):
+        est_2d._check_input_shape(torch.randn(10, 4))
+
+
+def test_pyroutils_scalar_condition_validation():
+    """EstimatorDistribution accepts batched scalar conditions."""
+    from sbi.neural_nets.ratio_estimators import RatioEstimator
+    from sbi.utils.pyroutils import RatioEstimatorDistribution
+
+    net = torch.nn.Identity()
+    ratio_est = RatioEstimator(
+        net=net, theta_shape=torch.Size([]), x_shape=torch.Size([2])
+    )
+    cond = torch.randn(5)  # batched scalar condition
+    dist = RatioEstimatorDistribution(ratio_est, cond)
+    assert dist.batch_shape == torch.Size([5])
+    assert dist.event_shape == torch.Size([2])
+
+
+def test_diffusion_finite_samples_scalar():
+    """Verify finiteness reduction in diffusion sampling for scalar shapes."""
+    final_samples = torch.randn(10, 3)
+    finite_samples = (
+        torch.isfinite(final_samples).reshape(*final_samples.shape[:2], -1).all(-1)
+    )
+    assert finite_samples.shape == (10, 3)
+    assert finite_samples.all()

@@ -96,7 +96,9 @@ class EstimatorDistribution(pyro.distributions.TorchDistribution):
                 f"{condition_shape_expected}."
             )
         else:
-            condition_shape = condition.shape[-len(condition_shape_expected) :]
+            condition_shape = condition.shape[
+                condition.dim() - len(condition_shape_expected) :
+            ]
             if condition_shape != condition_shape_expected:
                 raise ValueError(
                     f"Condition shape {condition_shape} is not compatible with "

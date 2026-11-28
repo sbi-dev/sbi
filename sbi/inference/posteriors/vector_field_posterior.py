@@ -393,7 +393,9 @@ class VectorFieldPosterior(NeuralPosterior):
 
         # The final step is in the last `num_xos` entries, also with save_intermediate.
         final_samples = samples[:, -diffuser.num_xos :]
-        finite_samples = torch.isfinite(final_samples).flatten(2).all(-1)
+        finite_samples = (
+            torch.isfinite(final_samples).reshape(*final_samples.shape[:2], -1).all(-1)
+        )
         if not finite_samples.any(0).all():
             message = (
                 "No finite sample after diffusion sampling: for at least one "

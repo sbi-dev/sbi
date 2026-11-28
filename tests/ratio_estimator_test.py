@@ -106,3 +106,27 @@ def test_ratio_estimator_scalar_shapes(theta_shape, x_shape):
     single_x = torch.zeros(x_shape)
     single_prefix = estimator._get_shape_prefix(single_theta, single_x)
     assert single_prefix == torch.Size([])
+
+
+def test_ratio_estimator_combine_scalar_pairing():
+    """Verify combine_theta_and_x properly pairs observations for scalar events."""
+    net = torch.nn.Identity()
+    estimator = RatioEstimator(
+        net=net, theta_shape=torch.Size([]), x_shape=torch.Size([])
+    )
+
+    theta = torch.tensor([1.0, 2.0])
+    x = torch.tensor([10.0, 20.0])
+    combined = estimator.combine_theta_and_x(theta, x)
+
+    assert combined.shape == (2, 2)
+    expected = torch.tensor([[1.0, 10.0], [2.0, 20.0]])
+    assert torch.equal(combined, expected)
+
+    # Test with multi-dimensional batch shape (e.g. 2 x 3)
+    theta_2d = torch.arange(6, dtype=torch.float32).reshape(2, 3)
+    x_2d = torch.arange(100, 106, dtype=torch.float32).reshape(2, 3)
+    combined_2d = estimator.combine_theta_and_x(theta_2d, x_2d)
+    assert combined_2d.shape == (2, 3, 2)
+    assert torch.equal(combined_2d[0, 0], torch.tensor([0.0, 100.0]))
+    assert torch.equal(combined_2d[1, 2], torch.tensor([5.0, 105.0]))
