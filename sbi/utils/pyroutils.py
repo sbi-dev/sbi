@@ -132,7 +132,7 @@ class ConditionalDensityEstimatorDistribution(EstimatorDistribution):
         # ConditionalDensityEstimator expects a batch shape of (batch_dim,)
         # and sample shape of (sample_dim,)
         trailing_dims = len(self.event_shape) + len(self.batch_shape)
-        sample_shape = x.shape[: x.dim() - trailing_dims]
+        sample_shape = x.shape[: max(x.dim() - trailing_dims, 0)]
         x = x.reshape(-1, self.batch_shape.numel(), *self.event_shape)
         lp = self.estimator.log_prob(x, condition=self._condition_reshaped)
         # reshape (sample_dim, batch_dim,) -> (*sample_shape, *batch_shape)
@@ -175,13 +175,20 @@ class RatioEstimatorDistribution(EstimatorDistribution):
     def log_prob(self, x: torch.Tensor) -> torch.Tensor:
         """Compute log probability of `x`."""
         # RatioEstimator expects condition and x to have the same leading shape
-        trailing_dims = len(self.event_shape) + len(self.batch_shape)
-        sample_shape = x.shape[: x.dim() - trailing_dims]
         condition_shape, event_shape = self._get_condition_and_event_shapes()
-        condition = self.condition.expand(
-            *sample_shape, *self.batch_shape, *condition_shape
-        )
-        x = x.expand(*sample_shape, *self.batch_shape, *event_shape)
+        event_dim = len(event_shape)
+        if event_dim > 0 and (
+            x.dim() < event_dim or x.shape[x.dim() - event_dim :] != event_shape
+        ):
+            raise ValueError(
+                f"Shape of x {tuple(x.shape)} does not match expected event shape "
+                f"{tuple(event_shape)}."
+            )
+        trailing_dims = event_dim + len(self.batch_shape)
+        sample_shape = x.shape[: max(x.dim() - trailing_dims, 0)]
+        target_shape = sample_shape + self.batch_shape
+        condition = self.condition.expand(target_shape + condition_shape)
+        x = x.expand(target_shape + event_shape)
         lp = self.estimator.unnormalized_log_ratio(theta=condition, x=x)
         return lp
 

@@ -1090,6 +1090,19 @@ def test_pyroutils_scalar_condition_validation():
     lp = dist.log_prob(x)
     assert lp.shape == torch.Size([5])
 
+    # Test event shape validation rejects mismatched event suffix
+    with pytest.raises(ValueError, match="does not match expected event shape"):
+        dist.log_prob(torch.randn(1))
+
+    # Test completely unbatched scalar condition and observation
+    net_scalar = torch.nn.Linear(2, 1)
+    ratio_scalar = RatioEstimator(
+        net=net_scalar, theta_shape=torch.Size([]), x_shape=torch.Size([])
+    )
+    dist_unbatched = RatioEstimatorDistribution(ratio_scalar, torch.tensor(1.0))
+    lp_unbatched = dist_unbatched.log_prob(torch.tensor(2.0))
+    assert lp_unbatched.shape == torch.Size([])
+
 
 def test_diffusion_finite_samples_scalar():
     """Verify finiteness reduction in diffusion sampling for scalar shapes."""
