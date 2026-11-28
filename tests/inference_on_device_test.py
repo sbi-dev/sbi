@@ -1160,3 +1160,74 @@ def test_torch_load_map_location_moves_restricted_prior_proposal():
     assert loaded.proposal.sample((10,)).device.type == "cpu"
     samples = loaded.sample((2,), x=zeros(1, 2), show_progress_bars=False)
     assert samples.device.type == "cpu"
+
+
+@pytest.mark.gpu
+def test_within_support_across_devices():
+    """`within_support` handles distributions and samples on different devices."""
+    device = process_device("gpu")
+    prior_cpu = BoxUniform(-torch.ones(2), torch.ones(2))
+    samples_gpu = torch.tensor([[0.0, 0.0], [2.0, 2.0]], device=device)
+    mask = utils.within_support(prior_cpu, samples_gpu)
+    assert mask.device.type == torch.device(device).type
+    assert torch.equal(mask, torch.tensor([True, False], device=device))
+
+    prior_gpu = BoxUniform(-torch.ones(2, device=device), torch.ones(2, device=device))
+    samples_cpu = torch.tensor([[0.0, 0.0], [2.0, 2.0]])
+    mask_cpu = utils.within_support(prior_gpu, samples_cpu)
+    assert mask_cpu.device.type == "cpu"
+    assert torch.equal(mask_cpu, torch.tensor([True, False]))
+
+
+@pytest.mark.gpu
+def test_diagnostics_with_posterior_on_device():
+    """`run_sbc` and `run_tarp` support CPU inputs with posteriors on an accelerator."""
+    from sbi.diagnostics import check_tarp, run_sbc, run_tarp
+    from sbi.diagnostics.sbc import check_prior_vs_dap
+
+    device = process_device("gpu")
+    prior_device = BoxUniform(
+        -torch.ones(2, device=device), torch.ones(2, device=device)
+    )
+    theta_train = prior_device.sample((50,))
+    x_train = theta_train + 0.1 * torch.randn_like(theta_train)
+
+    trainer = NPE(prior=prior_device, device=device, show_progress_bars=False)
+    trainer.append_simulations(theta_train, x_train)
+    trainer.train(max_num_epochs=1)
+    posterior = trainer.build_posterior()
+
+    # Simulator outputs on CPU
+    prior_cpu = BoxUniform(-torch.ones(2), torch.ones(2))
+    thetas_cpu = prior_cpu.sample((10,))
+    xs_cpu = thetas_cpu + 0.1 * torch.randn_like(thetas_cpu)
+
+    # Test run_sbc
+    ranks, dap_samples = run_sbc(
+        thetas_cpu, xs_cpu, posterior, num_posterior_samples=5, show_progress_bar=False
+    )
+    assert dap_samples.device.type == "cpu"
+    assert dap_samples.shape == (10, 2)
+    assert ranks.shape == (10, 2)
+    check_prior_vs_dap(prior_cpu.sample((10,)), dap_samples)
+
+    # Test run_tarp with auto-generated references
+    ecp, alpha = run_tarp(
+        thetas_cpu, xs_cpu, posterior, num_posterior_samples=5, show_progress_bar=False
+    )
+    atc, ks_pval = check_tarp(ecp, alpha, num_tarp_samples=thetas_cpu.shape[0])
+    assert isinstance(atc, float)
+
+    # Test run_tarp with explicit CPU references and z_scoring
+    refs_cpu = torch.zeros_like(thetas_cpu)
+    ecp_z, alpha_z = run_tarp(
+        thetas_cpu,
+        xs_cpu,
+        posterior,
+        num_posterior_samples=5,
+        references=refs_cpu,
+        z_score_theta=True,
+        show_progress_bar=False,
+    )
+    atc_z, ks_pval_z = check_tarp(ecp_z, alpha_z, num_tarp_samples=thetas_cpu.shape[0])
+    assert isinstance(atc_z, float)

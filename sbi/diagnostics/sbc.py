@@ -79,7 +79,7 @@ def run_sbc(
     )
 
     # Take a random draw from each posterior to get data-averaged posterior samples.
-    dap_samples = posterior_samples[0, :, :]
+    dap_samples = posterior_samples[0, :, :].to(thetas.device)
     assert dap_samples.shape == (num_sbc_samples, thetas.shape[1]), "Wrong DAP shape."
 
     # Create wrapper for reduce_fns if using a VIPosterior that ensures it is trained
@@ -157,6 +157,9 @@ def _run_sbc(
         Tensor of ranks for each parameter and reduction function.
     """
     num_sbc_samples = thetas.shape[0]
+    device = posterior_samples.device
+    thetas = thetas.to(device)
+    xs = xs.to(device)
 
     # Construct reduce functions for SBC or expected coverage.
     reduce_fns = _prepare_reduce_functions(reduce_fns, thetas.shape[1])

@@ -38,7 +38,7 @@ from torch.optim.adam import Adam
 from sbi import __version__
 from sbi.sbi_types import TorchTransform
 from sbi.utils.pbar import end_progress_line, print_progress
-from sbi.utils.torchutils import unwrap_mixture_support
+from sbi.utils.torchutils import infer_tensor_device, unwrap_mixture_support
 
 _T = TypeVar("_T")
 logger = logging.getLogger(__name__)
@@ -923,6 +923,13 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
     if distribution is None:
         return torch.ones(samples.shape[:-1], dtype=torch.bool, device=samples.device)
 
+    dist_device = (
+        getattr(distribution, "_device", None)
+        or getattr(distribution, "device", None)
+        or infer_tensor_device(distribution)
+    )
+    samples_for_check = samples if dist_device is None else samples.to(dist_device)
+
     # Try to check using the support property, use log prob method otherwise.
     # Before torch v1.7.0, `support.check()` returned bools for every element.
     # From v1.8.0 on, it directly considers all dimensions of a sample. E.g.,
@@ -931,15 +938,17 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
     # return [[True, True, True]]. This is relevant for `ImproperEmpirical`
     # distributions in SBI, which are used in SNPE.
     try:
-        sample_check = distribution.support.check(samples)
-        if sample_check.shape == samples.shape:
+        sample_check = distribution.support.check(samples_for_check)
+        if sample_check.shape == samples_for_check.shape:
             sample_check = torch.all(sample_check, dim=-1)
-        return sample_check
+        return sample_check.to(samples.device)
 
     # Falling back to log prob method of either the NeuralPosterior's net, or of a
     # custom wrapper distribution's.
     except (NotImplementedError, AttributeError):
-        return torch.isfinite(distribution.log_prob(samples))
+        return torch.isfinite(distribution.log_prob(samples_for_check)).to(
+            samples.device
+        )
 
 
 def warn_if_outside_prior_support(

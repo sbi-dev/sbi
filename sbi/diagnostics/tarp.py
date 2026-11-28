@@ -187,6 +187,9 @@ def _run_tarp(
         "references must have the same shape as thetas"
     )
 
+    thetas = thetas.to(input_device)
+    references = references.to(input_device)
+
     if num_bins is None:
         num_bins = num_tarp_samples
 
@@ -262,6 +265,7 @@ def _get_tarp_bounds(
     Bounds that depend on each theta and its posterior samples alike keep them
     exchangeable, so the coverage values stay uniform under calibration.
     """
+    thetas = thetas.to(posterior_samples.device)
     lo = torch.minimum(thetas.amin(dim=0), posterior_samples.amin(dim=(0, 1)))
     hi = torch.maximum(thetas.amax(dim=0), posterior_samples.amax(dim=(0, 1)))
     return lo, hi
