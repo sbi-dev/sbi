@@ -308,7 +308,7 @@ class MaskedConditionalEstimator(nn.Module, ABC):
                 f"be compatible with the provided input_shape {exp_input_shape}."
             )
         else:
-            input_shape = input.shape[-len(self.input_shape) :]
+            input_shape = input.shape[input.dim() - len(self.input_shape) :]
             if input_shape != exp_input_shape:
                 raise ValueError(
                     f"Shape of input {input_shape} does not match the "
