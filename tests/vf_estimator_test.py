@@ -1072,11 +1072,11 @@ def test_masked_conditional_estimator_check_input_shape():
 
 
 def test_pyroutils_scalar_condition_validation():
-    """EstimatorDistribution accepts batched scalar conditions."""
+    """EstimatorDistribution accepts batched scalar conditions and broadcasts x."""
     from sbi.neural_nets.ratio_estimators import RatioEstimator
     from sbi.utils.pyroutils import RatioEstimatorDistribution
 
-    net = torch.nn.Identity()
+    net = torch.nn.Linear(3, 1)
     ratio_est = RatioEstimator(
         net=net, theta_shape=torch.Size([]), x_shape=torch.Size([2])
     )
@@ -1084,6 +1084,11 @@ def test_pyroutils_scalar_condition_validation():
     dist = RatioEstimatorDistribution(ratio_est, cond)
     assert dist.batch_shape == torch.Size([5])
     assert dist.event_shape == torch.Size([2])
+
+    # Test log_prob broadcasting x against batch shape
+    x = torch.randn(2)
+    lp = dist.log_prob(x)
+    assert lp.shape == torch.Size([5])
 
 
 def test_diffusion_finite_samples_scalar():

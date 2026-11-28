@@ -177,10 +177,11 @@ class RatioEstimatorDistribution(EstimatorDistribution):
         # RatioEstimator expects condition and x to have the same leading shape
         trailing_dims = len(self.event_shape) + len(self.batch_shape)
         sample_shape = x.shape[: x.dim() - trailing_dims]
-        condition_shape, _ = self._get_condition_and_event_shapes()
+        condition_shape, event_shape = self._get_condition_and_event_shapes()
         condition = self.condition.expand(
             *sample_shape, *self.batch_shape, *condition_shape
         )
+        x = x.expand(*sample_shape, *self.batch_shape, *event_shape)
         lp = self.estimator.unnormalized_log_ratio(theta=condition, x=x)
         return lp
 
