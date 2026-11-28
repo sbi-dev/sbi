@@ -1,6 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
+import re
+
 import pytest
 import torch
 from torch import Tensor, eye, norm, ones, zeros
@@ -565,3 +567,32 @@ def test_lra_removes_parameters_outside_bounded_prior(
     assert len(summary[per_sample_key]) == len(samples)
     if method is SMCABC:
         assert torch.isclose(summary["final_weights"].exp().sum(), torch.tensor(1.0))
+
+
+@pytest.mark.parametrize("unsupported_kwarg", ["lra", "sass"])
+def test_smcabc_iid_unsupported_flags_raise_full_assertion_message(unsupported_kwarg):
+    """SMCABC with iid-data distance rejects lra and sass with complete message."""
+    prior = BoxUniform(-ones(2), ones(2))
+
+    def dummy_dist(x_o, x):
+        return torch.zeros(x.shape[0])
+
+    smcabc = SMCABC(
+        lambda theta: theta,
+        prior,
+        distance=dummy_dist,
+        requires_iid_data=True,
+    )
+    expected_msg = (
+        f"Currently there is no support to run inference on multiple "
+        f"observations together with {unsupported_kwarg}."
+    )
+    with pytest.raises(AssertionError, match=re.escape(expected_msg)):
+        smcabc(
+            zeros(2, 2),
+            num_particles=10,
+            num_initial_pop=20,
+            num_simulations=100,
+            epsilon_decay=0.5,
+            **{unsupported_kwarg: True},
+        )

@@ -227,12 +227,12 @@ class SMCABC(ABCBASE):
         assert isinstance(epsilon_decay, float) and epsilon_decay > 0.0
         assert not (self.distance.requires_iid_data and lra), (
             "Currently there is no support to run inference "
+            "on multiple observations together with lra."
         )
-        "on multiple observations together with lra."
         assert not (self.distance.requires_iid_data and sass), (
             "Currently there is no support to run inference "
+            "on multiple observations together with sass."
         )
-        "on multiple observations together with sass."
 
         # Pilot run for SASS.
         if sass:
